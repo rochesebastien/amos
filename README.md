@@ -1,5 +1,7 @@
 # CheveluAI
 
+![CheveluAI](github_cover.png)
+
 A self-hosted, Codex-style AI workspace. Chat with your own model, organize work
 into **Projects** (each with its own pre-prompt), and manage **MCP** servers that
 you can attach to projects to give the model tools.
