@@ -21,11 +21,7 @@ import {
 } from "lucide-react";
 import { api, type Conversation, type Project } from "@/lib/api";
 import { useApp, type View } from "@/lib/store";
-import {
-  useSidebar,
-  type ProjectSort,
-  SIDEBAR_RAIL,
-} from "@/lib/sidebar";
+import { useSidebar, type ProjectSort, SIDEBAR_RAIL } from "@/lib/sidebar";
 import { cn } from "@/lib/utils";
 
 const NAV: { view: View; label: string; icon: React.ElementType }[] = [
@@ -62,14 +58,22 @@ export function Sidebar() {
     dataVersion,
     refresh,
   } = useApp();
-  const { width, collapsed, sort, setWidth, setCollapsed, toggle, setSort } = useSidebar();
+  const { width, collapsed, sort, folded, setWidth, setCollapsed, toggle, setSort, toggleFold } =
+    useSidebar();
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [folded, setFolded] = useState<Set<number>>(new Set());
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editValue, setEditValue] = useState("");
   const [sortOpen, setSortOpen] = useState(false);
+
+  // inline editing
+  const [editConvId, setEditConvId] = useState<number | null>(null);
+  const [editConvValue, setEditConvValue] = useState("");
+  const [editProjId, setEditProjId] = useState<number | null>(null);
+  const [editProjValue, setEditProjValue] = useState("");
+
+  // drag & drop
+  const draggedConv = useRef<number | null>(null);
+  const [dropTarget, setDropTarget] = useState<number | null>(null);
 
   useEffect(() => {
     api.listConversations().then(setConversations).catch(() => setConversations([]));
@@ -77,10 +81,8 @@ export function Sidebar() {
   }, [dataVersion]);
 
   // ----- drag to resize -----
-  const dragging = useRef(false);
   const onDragStart = (e: React.MouseEvent) => {
     e.preventDefault();
-    dragging.current = true;
     const startX = e.clientX;
     const startW = width;
     document.body.style.userSelect = "none";
@@ -95,7 +97,6 @@ export function Sidebar() {
       setWidth(w);
     };
     const onUp = () => {
-      dragging.current = false;
       document.body.style.userSelect = "";
       document.body.style.cursor = "";
       window.removeEventListener("mousemove", onMove);
@@ -105,13 +106,6 @@ export function Sidebar() {
     window.addEventListener("mouseup", onUp);
   };
 
-  const toggleFold = (id: number) =>
-    setFolded((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-
   const removeConversation = async (e: React.MouseEvent, id: number) => {
     e.stopPropagation();
     await api.deleteConversation(id);
@@ -119,21 +113,61 @@ export function Sidebar() {
     refresh();
   };
 
-  const startRename = (e: React.MouseEvent, c: Conversation) => {
+  // ----- conversation rename -----
+  const startConvRename = (e: React.MouseEvent, c: Conversation) => {
     e.stopPropagation();
-    setEditingId(c.id);
-    setEditValue(c.title);
+    setEditConvId(c.id);
+    setEditConvValue(c.title);
   };
-  const commitRename = async () => {
-    if (editingId == null) return;
-    const id = editingId;
-    const value = editValue.trim();
-    setEditingId(null);
+  const commitConvRename = async () => {
+    if (editConvId == null) return;
+    const id = editConvId;
+    const value = editConvValue.trim();
+    setEditConvId(null);
     const current = conversations.find((c) => c.id === id);
     if (value && current && value !== current.title) {
       await api.renameConversation(id, value);
       refresh();
     }
+  };
+
+  // ----- project rename -----
+  const startProjRename = (e: React.MouseEvent, p: Project) => {
+    e.stopPropagation();
+    setEditProjId(p.id);
+    setEditProjValue(p.name);
+  };
+  const commitProjRename = async () => {
+    if (editProjId == null) return;
+    const id = editProjId;
+    const value = editProjValue.trim();
+    setEditProjId(null);
+    const p = projects.find((x) => x.id === id);
+    if (value && p && value !== p.name) {
+      await api.updateProject(id, {
+        name: value,
+        description: p.description,
+        system_prompt: p.system_prompt,
+        model: p.model,
+        mcp_ids: p.mcp_ids,
+      });
+      refresh();
+    }
+  };
+
+  // ----- drag & drop move -----
+  const onDropToGroup = async (groupId: number) => {
+    const convId = draggedConv.current;
+    draggedConv.current = null;
+    setDropTarget(null);
+    if (convId == null) return;
+    const conv = conversations.find((c) => c.id === convId);
+    const target = groupId === NO_PROJECT ? null : groupId;
+    if (!conv || conv.project_id === target) return;
+    // optimistic
+    setConversations((cs) => cs.map((c) => (c.id === convId ? { ...c, project_id: target } : c)));
+    await api.updateConversation(convId, { project_id: target });
+    refresh();
   };
 
   // ----- group + sort -----
@@ -321,22 +355,65 @@ export function Sidebar() {
 
         <div className="flex flex-col gap-0.5">
           {groups.map((g) => {
-            const isFolded = folded.has(g.id);
+            const isFolded = folded.includes(g.id);
             const isOrphan = g.id === NO_PROJECT;
+            const isDropTarget = dropTarget === g.id;
             return (
-              <div key={g.id} className="flex flex-col">
+              <div
+                key={g.id}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  if (dropTarget !== g.id) setDropTarget(g.id);
+                }}
+                onDragLeave={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropTarget(null);
+                }}
+                onDrop={() => onDropToGroup(g.id)}
+                className={cn(
+                  "flex flex-col rounded-md",
+                  isDropTarget && "bg-primary/10 ring-1 ring-primary/40",
+                )}
+              >
                 <div className="group/folder flex items-center gap-1 rounded-md px-1.5 py-1 text-[13px] text-muted-foreground transition-colors hover:bg-sidebar-accent/50">
-                  <button onClick={() => toggleFold(g.id)} className="flex min-w-0 flex-1 items-center gap-1.5">
-                    <ChevronRight className={cn("size-3.5 shrink-0 transition-transform", !isFolded && "rotate-90")} />
-                    {isOrphan ? (
-                      <Inbox className="size-3.5 shrink-0" />
-                    ) : isFolded ? (
-                      <Folder className="size-3.5 shrink-0" />
-                    ) : (
-                      <FolderOpen className="size-3.5 shrink-0" />
-                    )}
-                    <span className="min-w-0 flex-1 truncate text-left font-medium">{g.name}</span>
+                  <button
+                    onClick={() => toggleFold(g.id)}
+                    className="flex shrink-0 items-center"
+                    title={isFolded ? "Expand" : "Collapse"}
+                  >
+                    <ChevronRight className={cn("size-3.5 transition-transform", !isFolded && "rotate-90")} />
                   </button>
+                  {isOrphan ? (
+                    <Inbox className="size-3.5 shrink-0" />
+                  ) : isFolded ? (
+                    <Folder className="size-3.5 shrink-0" />
+                  ) : (
+                    <FolderOpen className="size-3.5 shrink-0" />
+                  )}
+                  {editProjId === g.id ? (
+                    <input
+                      autoFocus
+                      value={editProjValue}
+                      onChange={(e) => setEditProjValue(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      onBlur={commitProjRename}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") commitProjRename();
+                        if (e.key === "Escape") setEditProjId(null);
+                      }}
+                      className="min-w-0 flex-1 rounded border border-input bg-card px-1 py-0.5 text-[13px] font-medium outline-none focus-visible:border-ring"
+                    />
+                  ) : (
+                    <button
+                      onClick={() => toggleFold(g.id)}
+                      onDoubleClick={(e) =>
+                        !isOrphan && startProjRename(e, projects.find((p) => p.id === g.id)!)
+                      }
+                      className="min-w-0 flex-1 truncate text-left font-medium"
+                      title={isOrphan ? undefined : "Double-click to rename"}
+                    >
+                      {g.name}
+                    </button>
+                  )}
                   {!isOrphan && (
                     <button
                       title={`New chat in ${g.name}`}
@@ -351,16 +428,24 @@ export function Sidebar() {
                 {!isFolded && (
                   <div className="flex flex-col gap-0.5 pb-1">
                     {g.convs.length === 0 ? (
-                      <p className="py-1 pl-7 text-[12px] text-muted-foreground/50">No conversations</p>
+                      <p className="py-1 pl-7 text-[12px] text-muted-foreground/50">
+                        {isDropTarget ? "Drop here" : "No conversations"}
+                      </p>
                     ) : (
                       g.convs.map((c) => {
                         const active = view === "chat" && activeConversationId === c.id;
-                        const editing = editingId === c.id;
+                        const editing = editConvId === c.id;
                         return (
                           <div
                             key={c.id}
+                            draggable={!editing}
+                            onDragStart={() => (draggedConv.current = c.id)}
+                            onDragEnd={() => {
+                              draggedConv.current = null;
+                              setDropTarget(null);
+                            }}
                             onClick={() => !editing && setActiveConversation(c.id)}
-                            onDoubleClick={(e) => startRename(e, c)}
+                            onDoubleClick={(e) => startConvRename(e, c)}
                             className={cn(
                               "group flex cursor-pointer items-center gap-2 rounded-md py-1.5 pl-7 pr-2 text-left text-[13px] transition-colors",
                               active
@@ -377,13 +462,13 @@ export function Sidebar() {
                             {editing ? (
                               <input
                                 autoFocus
-                                value={editValue}
-                                onChange={(e) => setEditValue(e.target.value)}
+                                value={editConvValue}
+                                onChange={(e) => setEditConvValue(e.target.value)}
                                 onClick={(e) => e.stopPropagation()}
-                                onBlur={commitRename}
+                                onBlur={commitConvRename}
                                 onKeyDown={(e) => {
-                                  if (e.key === "Enter") commitRename();
-                                  if (e.key === "Escape") setEditingId(null);
+                                  if (e.key === "Enter") commitConvRename();
+                                  if (e.key === "Escape") setEditConvId(null);
                                 }}
                                 className="min-w-0 flex-1 rounded border border-input bg-card px-1 py-0.5 text-[13px] outline-none focus-visible:border-ring"
                               />
