@@ -47,10 +47,43 @@ async def _rpc(client: httpx.AsyncClient, url: str, method: str, params: dict | 
     return _parse_response(r)
 
 
-def _client(config: dict) -> tuple[httpx.AsyncClient, str]:
+def resolve_url(config: dict) -> str:
+    """Resolve the MCP endpoint URL.
+
+    Accepts either a full ``url`` (back-compat) or structured parts:
+    ``scheme`` (http/https), ``host``, ``port``, ``path``. If ``host`` already
+    contains a scheme it is treated as the base.
+    """
     url = config.get("url") or config.get("endpoint")
-    if not url:
-        raise ValueError("Remote MCP requires a 'url' in config")
+    if url:
+        return str(url).strip()
+
+    host = (config.get("host") or "").strip()
+    if not host:
+        raise ValueError("Remote MCP requires a 'url' or a 'host' in config")
+
+    path = (config.get("path") or "").strip()
+    if path and not path.startswith("/"):
+        path = "/" + path
+
+    # host may already include a scheme (and possibly a port)
+    if host.startswith("http://") or host.startswith("https://"):
+        base = host.rstrip("/")
+        port = config.get("port")
+        if port and ":" not in base.split("//", 1)[1]:
+            base = f"{base}:{port}"
+        return base + path
+
+    scheme = (config.get("scheme") or "http").strip()
+    base = f"{scheme}://{host.rstrip('/')}"
+    port = config.get("port")
+    if port:
+        base = f"{base}:{port}"
+    return base + path
+
+
+def _client(config: dict) -> tuple[httpx.AsyncClient, str]:
+    url = resolve_url(config)
     headers = dict(config.get("headers") or {})
     return httpx.AsyncClient(timeout=60, follow_redirects=True, headers=headers), url
 
