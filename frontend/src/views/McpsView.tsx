@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Plug,
   Plus,
@@ -16,10 +16,9 @@ import {
   type MCP,
   type MCPType,
   type MCPInput,
-  type Project,
   type ToolPreview,
 } from "@/lib/api";
-import { useApp } from "@/lib/store";
+import { useMcpMutations, useMcps, useProjects } from "@/lib/queries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -204,20 +203,15 @@ function mcpToForm(m: MCP): FormState {
 }
 
 export function McpsView() {
-  const { dataVersion, refresh } = useApp();
-  const [mcps, setMcps] = useState<MCP[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const { data: mcps = [] } = useMcps();
+  const { data: projects = [] } = useProjects();
+  const mutations = useMcpMutations();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<MCP | null>(null);
   const [form, setForm] = useState<FormState>(blank);
   const [saving, setSaving] = useState(false);
   const [preview, setPreview] = useState<{ ok: boolean; tools: ToolPreview[]; error?: string | null } | null>(null);
   const [testing, setTesting] = useState(false);
-
-  useEffect(() => {
-    api.listMcps().then(setMcps).catch(() => {});
-    api.listProjects().then(setProjects).catch(() => {});
-  }, [dataVersion]);
 
   const openNew = () => {
     setEditing(null);
@@ -245,10 +239,9 @@ export function McpsView() {
     if (!form.name.trim()) return;
     setSaving(true);
     try {
-      if (editing) await api.updateMcp(editing.id, payload());
-      else await api.createMcp(payload());
+      if (editing) await mutations.update.mutateAsync({ id: editing.id, body: payload() });
+      else await mutations.create.mutateAsync(payload());
       setOpen(false);
-      refresh();
     } finally {
       setSaving(false);
     }
@@ -256,8 +249,7 @@ export function McpsView() {
 
   const remove = async (m: MCP) => {
     if (!confirm(`Delete MCP “${m.name}”?`)) return;
-    await api.deleteMcp(m.id);
-    refresh();
+    await mutations.remove.mutateAsync(m.id);
   };
 
   // Live preview: OpenAPI parses without saving; remote/code save-then-test.
@@ -276,12 +268,11 @@ export function McpsView() {
       } else {
         // create-or-update first, then hit the live /test endpoint
         const saved = editing
-          ? await api.updateMcp(editing.id, payload())
-          : await api.createMcp(payload());
+          ? await mutations.update.mutateAsync({ id: editing.id, body: payload() })
+          : await mutations.create.mutateAsync(payload());
         if (!editing) setEditing(saved);
         const res = await api.testMcp(saved.id);
         setPreview(res);
-        refresh();
       }
     } catch (e: any) {
       setPreview({ ok: false, tools: [], error: String(e.message ?? e) });
@@ -299,15 +290,17 @@ export function McpsView() {
     }));
 
   const toggleEnabled = async (m: MCP) => {
-    await api.updateMcp(m.id, {
-      name: m.name,
-      description: m.description,
-      type: m.type,
-      enabled: !m.enabled,
-      config: m.config,
-      project_ids: m.project_ids,
+    await mutations.update.mutateAsync({
+      id: m.id,
+      body: {
+        name: m.name,
+        description: m.description,
+        type: m.type,
+        enabled: !m.enabled,
+        config: m.config,
+        project_ids: m.project_ids,
+      },
     });
-    refresh();
   };
 
   return (

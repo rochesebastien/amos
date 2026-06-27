@@ -2,7 +2,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 type Variant = "primary" | "secondary" | "outline" | "ghost" | "destructive";
-type Size = "sm" | "md" | "lg" | "icon";
+type Size = "sm" | "md" | "lg" | "icon" | "icon-sm" | "icon-xs";
 
 const variants: Record<Variant, string> = {
   primary:
@@ -20,6 +20,8 @@ const sizes: Record<Size, string> = {
   md: "h-9 px-4 text-sm gap-2",
   lg: "h-11 px-6 text-base gap-2",
   icon: "h-9 w-9",
+  "icon-sm": "size-8",
+  "icon-xs": "size-6",
 };
 
 export interface ButtonProps

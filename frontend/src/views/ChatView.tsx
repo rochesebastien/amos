@@ -1,16 +1,44 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, Square, Wrench, Sparkles, AlertCircle } from "lucide-react";
+import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import {
-  api,
-  streamChat,
-  type Project,
-  type Message,
-  type ChatEvent,
-} from "@/lib/api";
-import { useApp } from "@/lib/store";
+  ArrowUp,
+  Square,
+  Wrench,
+  Sparkles,
+  AlertCircle,
+  Copy,
+  Check,
+  Paperclip,
+  FileText,
+  X,
+} from "lucide-react";
+import { streamChat, type Message, type ChatEvent } from "@/lib/api";
+import { qk, useConversation, useProjects } from "@/lib/queries";
 import { Markdown } from "@/components/Markdown";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
+import {
+  Message as MessageRow,
+  MessageAvatar,
+  MessageContent,
+  MessageFooter,
+  MessageHeader,
+} from "@/components/ui/message";
+import { Bubble, BubbleContent } from "@/components/ui/bubble";
+import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker";
+import {
+  Attachment,
+  AttachmentAction,
+  AttachmentActions,
+  AttachmentContent,
+  AttachmentDescription,
+  AttachmentGroup,
+  AttachmentMedia,
+  AttachmentTitle,
+} from "@/components/ui/attachment";
+import { cn } from "@/lib/utils";
 
 type ToolActivity = { id: string; name: string; args: any; result?: any };
 type UIMsg = {
@@ -19,6 +47,21 @@ type UIMsg = {
   tools?: ToolActivity[];
   error?: string;
 };
+
+type StagedFile = {
+  id: string;
+  file: File;
+  text: string | null; // inlined content for text-like files
+  state: "uploading" | "processing" | "error" | "done";
+};
+
+const TEXT_LIKE = /^(text\/|application\/(json|xml|x-yaml|yaml|javascript|typescript))/;
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
 
 function historyToUI(messages: Message[]): UIMsg[] {
   const out: UIMsg[] = [];
@@ -45,52 +88,103 @@ function historyToUI(messages: Message[]): UIMsg[] {
 }
 
 export function ChatView() {
-  const { activeConversationId, setActiveConversation, draftProjectId, refresh } = useApp();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [projectId, setProjectId] = useState<number | null>(draftProjectId);
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const params = useParams({ strict: false }) as { conversationId?: string };
+  const search = useSearch({ strict: false }) as { project?: number };
+  const conversationId = params.conversationId ? Number(params.conversationId) : null;
+
+  const { data: projects = [] } = useProjects();
+  const { data: conversation } = useConversation(conversationId);
+
+  const [projectId, setProjectId] = useState<number | null>(search.project ?? null);
   const [messages, setMessages] = useState<UIMsg[]>([]);
   const [input, setInput] = useState("");
+  const [attachments, setAttachments] = useState<StagedFile[]>([]);
   const [streaming, setStreaming] = useState(false);
-  const [title, setTitle] = useState("New chat");
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    api.listProjects().then(setProjects).catch(() => {});
-  }, []);
+  const title = conversation?.title ?? "New chat";
 
-  // load conversation when selected; reset for a new chat
+  // reset when navigating to a brand-new chat
   useEffect(() => {
-    if (activeConversationId == null) {
+    if (conversationId == null) {
       setMessages([]);
-      setTitle("New chat");
-      setProjectId(draftProjectId);
-      return;
+      setProjectId(search.project ?? null);
     }
-    api
-      .getConversation(activeConversationId)
-      .then((c) => {
-        setMessages(historyToUI(c.messages));
-        setTitle(c.title);
-        setProjectId(c.project_id);
-      })
-      .catch(() => {});
-  }, [activeConversationId, draftProjectId]);
+  }, [conversationId, search.project]);
+
+  // load history once the conversation query resolves
+  useEffect(() => {
+    if (conversation) {
+      setMessages(historyToUI(conversation.messages));
+      setProjectId(conversation.project_id);
+    }
+  }, [conversation]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
 
+  // ----- attachments -----
+  const onPickFiles = async (files: FileList | null) => {
+    if (!files?.length) return;
+    const picked: StagedFile[] = Array.from(files).map((file) => ({
+      id: `${file.name}-${file.size}-${Math.random().toString(36).slice(2)}`,
+      file,
+      text: null,
+      state: "processing",
+    }));
+    setAttachments((a) => [...a, ...picked]);
+    for (const item of picked) {
+      const isText = TEXT_LIKE.test(item.file.type) || /\.(md|txt|csv|log)$/i.test(item.file.name);
+      try {
+        const text = isText ? await item.file.text() : null;
+        setAttachments((a) =>
+          a.map((x) => (x.id === item.id ? { ...x, text, state: "done" } : x)),
+        );
+      } catch {
+        setAttachments((a) =>
+          a.map((x) => (x.id === item.id ? { ...x, state: "error" } : x)),
+        );
+      }
+    }
+  };
+
+  const removeAttachment = (id: string) =>
+    setAttachments((a) => a.filter((x) => x.id !== id));
+
+  const composeMessage = (text: string): string => {
+    const parts = [text.trim()];
+    for (const a of attachments) {
+      if (a.text != null) {
+        parts.push(`\n\n--- ${a.file.name} ---\n${a.text}`);
+      } else {
+        parts.push(`\n\n[attached: ${a.file.name} (${formatBytes(a.file.size)})]`);
+      }
+    }
+    return parts.join("");
+  };
+
   const send = async () => {
     const text = input.trim();
-    if (!text || streaming) return;
+    if ((!text && attachments.length === 0) || streaming) return;
+    const composed = composeMessage(text);
+    const display = text || attachments.map((a) => a.file.name).join(", ");
     setInput("");
-    setMessages((m) => [...m, { role: "user", content: text }, { role: "assistant", content: "" }]);
+    setAttachments([]);
+    setMessages((m) => [
+      ...m,
+      { role: "user", content: display },
+      { role: "assistant", content: "" },
+    ]);
     setStreaming(true);
 
     const ac = new AbortController();
     abortRef.current = ac;
-    let convId = activeConversationId;
+    let convId = conversationId;
     const toolIndex: Record<string, number> = {};
 
     const update = (fn: (a: UIMsg) => void) =>
@@ -132,16 +226,22 @@ export function ChatView() {
     };
 
     try {
-      await streamChat({ conversation_id: convId, project_id: projectId, message: text }, onEvent, ac.signal);
+      await streamChat(
+        { conversation_id: convId, project_id: projectId, message: composed },
+        onEvent,
+        ac.signal,
+      );
     } catch (e: any) {
       if (e.name !== "AbortError") update((a) => (a.error = String(e.message ?? e)));
     } finally {
       setStreaming(false);
       abortRef.current = null;
-      if (convId && convId !== activeConversationId) {
-        setActiveConversation(convId);
+      qc.invalidateQueries({ queryKey: qk.conversations });
+      if (convId && convId !== conversationId) {
+        navigate({ to: "/c/$conversationId", params: { conversationId: String(convId) } });
+      } else if (convId) {
+        qc.invalidateQueries({ queryKey: qk.conversation(convId) });
       }
-      refresh();
     }
   };
 
@@ -166,7 +266,7 @@ export function ChatView() {
           <span className="text-[13px] text-muted-foreground">Project</span>
           <Select
             value={projectId ?? ""}
-            disabled={activeConversationId != null}
+            disabled={conversationId != null}
             onChange={(e) => setProjectId(e.target.value ? Number(e.target.value) : null)}
             className="h-8 w-44 text-[13px]"
           >
@@ -198,7 +298,11 @@ export function ChatView() {
           ) : (
             <div className="flex flex-col gap-6">
               {messages.map((m, i) => (
-                <MessageBubble key={i} msg={m} streaming={streaming && i === messages.length - 1} />
+                <ChatMessage
+                  key={i}
+                  msg={m}
+                  streaming={streaming && i === messages.length - 1}
+                />
               ))}
             </div>
           )}
@@ -207,84 +311,194 @@ export function ChatView() {
 
       {/* composer */}
       <div className="border-t border-border px-6 py-4">
-        <div className="mx-auto flex w-full max-w-3xl items-end gap-2 rounded-xl border border-input bg-card p-2 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={onKeyDown}
-            rows={1}
-            placeholder="Send a message…"
-            className="max-h-48 min-h-[36px] flex-1 resize-none bg-transparent px-2 py-1.5 text-sm outline-none placeholder:text-muted-foreground"
-          />
-          {streaming ? (
-            <Button size="icon" variant="secondary" onClick={stop} title="Stop">
-              <Square className="size-4" />
-            </Button>
-          ) : (
-            <Button size="icon" onClick={send} disabled={!input.trim()} title="Send">
-              <ArrowUp className="size-4" />
-            </Button>
+        <div className="mx-auto w-full max-w-3xl">
+          {attachments.length > 0 && (
+            <AttachmentGroup className="mb-2">
+              {attachments.map((a) => (
+                <Attachment key={a.id} size="sm" state={a.state} className="w-56">
+                  <AttachmentMedia>
+                    <FileText />
+                  </AttachmentMedia>
+                  <AttachmentContent>
+                    <AttachmentTitle>{a.file.name}</AttachmentTitle>
+                    <AttachmentDescription>
+                      {a.state === "error"
+                        ? "Could not read file"
+                        : `${formatBytes(a.file.size)}${a.text != null ? " · inlined" : ""}`}
+                    </AttachmentDescription>
+                  </AttachmentContent>
+                  <AttachmentActions>
+                    <AttachmentAction
+                      aria-label={`Remove ${a.file.name}`}
+                      onClick={() => removeAttachment(a.id)}
+                    >
+                      <X />
+                    </AttachmentAction>
+                  </AttachmentActions>
+                </Attachment>
+              ))}
+            </AttachmentGroup>
           )}
+
+          <div className="flex items-end gap-2 rounded-xl border border-input bg-card p-2 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30">
+            <input
+              ref={fileRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                onPickFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => fileRef.current?.click()}
+              title="Attach files"
+            >
+              <Paperclip className="size-4" />
+            </Button>
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={onKeyDown}
+              rows={1}
+              placeholder="Send a message…"
+              className="max-h-48 min-h-[36px] flex-1 resize-none bg-transparent px-1 py-1.5 text-sm outline-none placeholder:text-muted-foreground"
+            />
+            {streaming ? (
+              <Button size="icon" variant="secondary" onClick={stop} title="Stop">
+                <Square className="size-4" />
+              </Button>
+            ) : (
+              <Button
+                size="icon"
+                onClick={send}
+                disabled={!input.trim() && attachments.length === 0}
+                title="Send"
+              >
+                <ArrowUp className="size-4" />
+              </Button>
+            )}
+          </div>
+          <p className="mt-2 text-center text-[11px] text-muted-foreground/60">
+            CheveluAI runs on your configured model. Verify important information.
+          </p>
         </div>
-        <p className="mx-auto mt-2 max-w-3xl text-center text-[11px] text-muted-foreground/60">
-          CheveluAI runs on your configured model. Verify important information.
-        </p>
       </div>
     </div>
   );
 }
 
-function MessageBubble({ msg, streaming }: { msg: UIMsg; streaming: boolean }) {
+function ChatMessage({ msg, streaming }: { msg: UIMsg; streaming: boolean }) {
   if (msg.role === "user") {
     return (
-      <div className="flex justify-end">
-        <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl bg-primary/15 px-4 py-2.5 text-sm">
-          {msg.content}
-        </div>
-      </div>
+      <MessageRow align="end">
+        <MessageContent>
+          <Bubble variant="tinted" align="end">
+            <BubbleContent>{msg.content}</BubbleContent>
+          </Bubble>
+        </MessageContent>
+      </MessageRow>
     );
   }
+
+  const thinking = streaming && !msg.content && !msg.tools?.length;
+
   return (
-    <div className="flex flex-col gap-2">
-      {msg.tools?.map((t) => <ToolChip key={t.id} tool={t} />)}
-      {msg.content && <Markdown content={msg.content} />}
-      {streaming && !msg.content && !msg.tools?.length && (
-        <span className="inline-block size-2 animate-pulse rounded-full bg-primary" />
-      )}
-      {msg.error && (
-        <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-[13px] text-destructive">
-          <AlertCircle className="mt-0.5 size-4 shrink-0" />
-          <span>{msg.error}</span>
+    <MessageRow align="start">
+      <MessageAvatar>
+        <div className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground font-display text-xs">
+          C
         </div>
-      )}
-    </div>
+      </MessageAvatar>
+      <MessageContent>
+        <MessageHeader>CheveluAI</MessageHeader>
+
+        {msg.tools?.map((t) => <ToolMarker key={t.id} tool={t} />)}
+
+        {thinking && (
+          <Marker role="status">
+            <MarkerIcon>
+              <Spinner />
+            </MarkerIcon>
+            <MarkerContent className="shimmer">Thinking…</MarkerContent>
+          </Marker>
+        )}
+
+        {msg.content && (
+          <Bubble variant="ghost">
+            <Markdown content={msg.content} />
+          </Bubble>
+        )}
+
+        {msg.error && (
+          <Bubble variant="destructive" className="max-w-none">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              <span>{msg.error}</span>
+            </div>
+          </Bubble>
+        )}
+
+        {!streaming && msg.content && (
+          <MessageFooter>
+            <CopyButton text={msg.content} />
+          </MessageFooter>
+        )}
+      </MessageContent>
+    </MessageRow>
   );
 }
 
-function ToolChip({ tool }: { tool: ToolActivity }) {
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <Button
+      size="icon-xs"
+      variant="ghost"
+      aria-label="Copy message"
+      onClick={() => {
+        navigator.clipboard?.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      }}
+    >
+      {copied ? <Check className="size-3.5 text-primary" /> : <Copy className="size-3.5" />}
+    </Button>
+  );
+}
+
+function ToolMarker({ tool }: { tool: ToolActivity }) {
   const [open, setOpen] = useState(false);
+  const running = tool.result === undefined;
   const resultStr =
     typeof tool.result === "string" ? tool.result : JSON.stringify(tool.result, null, 2);
   return (
-    <div className="rounded-lg border border-border bg-muted/40 text-[13px]">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left"
+    <div className="w-full">
+      <Marker
+        asChild
+        variant="border"
+        role={running ? "status" : undefined}
+        className="w-full"
       >
-        <Wrench className="size-3.5 text-primary" />
-        <span className="font-medium">{tool.name}</span>
-        <span className="text-muted-foreground">
-          {tool.result === undefined ? "running…" : "done"}
-        </span>
-      </button>
+        <button type="button" onClick={() => setOpen((o) => !o)}>
+          <MarkerIcon>{running ? <Spinner /> : <Wrench />}</MarkerIcon>
+          <MarkerContent className={cn("font-medium text-foreground", running && "shimmer")}>
+            {tool.name}
+          </MarkerContent>
+          <span className="ml-auto text-[12px] text-muted-foreground">
+            {running ? "running…" : open ? "hide" : "details"}
+          </span>
+        </button>
+      </Marker>
       {open && (
-        <div className="border-t border-border px-3 py-2">
-          <pre className="overflow-x-auto whitespace-pre-wrap break-words text-[12px] text-muted-foreground">
-            {`args: ${typeof tool.args === "string" ? tool.args : JSON.stringify(tool.args)}\n${
-              tool.result !== undefined ? `result: ${resultStr}` : ""
-            }`}
-          </pre>
-        </div>
+        <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-muted/40 px-3 py-2 text-[12px] text-muted-foreground">
+          {`args: ${typeof tool.args === "string" ? tool.args : JSON.stringify(tool.args)}\n${
+            tool.result !== undefined ? `result: ${resultStr}` : ""
+          }`}
+        </pre>
       )}
     </div>
   );

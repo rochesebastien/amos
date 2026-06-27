@@ -28,6 +28,9 @@ gateway — from **Settings**. Nothing about the model is hardcoded.
 
 ```
 frontend/   React + Vite + TypeScript + Tailwind v4 (Mona Sans, custom palette)
+            TanStack Router (URL routing) + TanStack Query (server state)
+            shadcn/ui primitives, incl. the AI components (Message, Bubble,
+            Marker, Attachment) for the chat surface
 backend/    FastAPI + SQLModel (SQLite) — LLM proxy, MCP runtime, OpenAPI→tools
 ```
 
