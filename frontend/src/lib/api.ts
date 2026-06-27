@@ -143,6 +143,11 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ title }),
     }),
+  updateConversation: (id: number, body: { title?: string; project_id?: number | null }) =>
+    req<Conversation>(`/api/conversations/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
   deleteConversation: (id: number) =>
     req<{ ok: boolean }>(`/api/conversations/${id}`, { method: "DELETE" }),
 };

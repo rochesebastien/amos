@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Plug,
   Plus,
@@ -16,15 +16,14 @@ import {
   type MCP,
   type MCPType,
   type MCPInput,
-  type Project,
   type ToolPreview,
 } from "@/lib/api";
-import { useApp } from "@/lib/store";
+import { useMcpMutations, useMcps, useProjects } from "@/lib/queries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Modal } from "@/components/ui/modal";
-import { Field } from "@/components/ui/select";
+import { Field, Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -45,8 +44,11 @@ type FormState = {
   specUrl: string;
   specText: string;
   baseUrl: string;
-  // remote
-  url: string;
+  // remote (HTTP streamable) — composed into a URL
+  scheme: string;
+  host: string;
+  port: string;
+  path: string;
   // shared
   headersText: string;
   // code
@@ -62,7 +64,10 @@ const blank: FormState = {
   specUrl: "",
   specText: "",
   baseUrl: "",
-  url: "",
+  scheme: "http",
+  host: "",
+  port: "",
+  path: "/mcp",
   headersText: "",
   code: `TOOLS = [
     {
@@ -93,6 +98,24 @@ function parseHeaders(text: string): Record<string, string> | undefined {
   }
 }
 
+// Compose the remote endpoint from its parts, for live preview + display.
+function composeRemoteUrl(f: Pick<FormState, "scheme" | "host" | "port" | "path">): string {
+  const host = f.host.trim();
+  if (!host) return "";
+  let path = f.path.trim();
+  if (path && !path.startsWith("/")) path = "/" + path;
+  if (host.startsWith("http://") || host.startsWith("https://")) {
+    const base = host.replace(/\/+$/, "");
+    const withPort = f.port.trim() && !/:\d+($|\/)/.test(base.split("//")[1] ?? "")
+      ? `${base}:${f.port.trim()}`
+      : base;
+    return withPort + path;
+  }
+  const base = `${f.scheme}://${host.replace(/\/+$/, "")}`;
+  const withPort = f.port.trim() ? `${base}:${f.port.trim()}` : base;
+  return withPort + path;
+}
+
 function buildConfig(f: FormState): Record<string, any> {
   const headers = parseHeaders(f.headersText);
   if (f.type === "openapi") {
@@ -110,15 +133,56 @@ function buildConfig(f: FormState): Record<string, any> {
     return cfg;
   }
   if (f.type === "remote") {
-    const cfg: Record<string, any> = { url: f.url.trim() };
+    const cfg: Record<string, any> = {
+      scheme: f.scheme,
+      host: f.host.trim(),
+      path: f.path.trim(),
+    };
+    if (f.port.trim()) cfg.port = Number(f.port.trim());
+    // also store the composed url for clarity / back-compat
+    const url = composeRemoteUrl(f);
+    if (url) cfg.url = url;
     if (headers) cfg.headers = headers;
     return cfg;
   }
   return { code: f.code };
 }
 
+function parseRemoteParts(c: Record<string, any>): {
+  scheme: string;
+  host: string;
+  port: string;
+  path: string;
+} {
+  // prefer structured parts when present
+  if (c.host) {
+    return {
+      scheme: c.scheme ?? "http",
+      host: String(c.host),
+      port: c.port != null ? String(c.port) : "",
+      path: c.path ?? "",
+    };
+  }
+  // otherwise parse a legacy full url
+  if (c.url || c.endpoint) {
+    try {
+      const u = new URL(c.url ?? c.endpoint);
+      return {
+        scheme: u.protocol.replace(":", "") || "http",
+        host: u.hostname,
+        port: u.port || "",
+        path: u.pathname === "/" ? "" : u.pathname,
+      };
+    } catch {
+      return { scheme: "http", host: String(c.url ?? c.endpoint ?? ""), port: "", path: "" };
+    }
+  }
+  return { scheme: "http", host: "", port: "", path: "/mcp" };
+}
+
 function mcpToForm(m: MCP): FormState {
   const c = m.config || {};
+  const remote = parseRemoteParts(c);
   return {
     ...blank,
     name: m.name,
@@ -129,27 +193,25 @@ function mcpToForm(m: MCP): FormState {
     specUrl: c.spec_url ?? "",
     specText: c.spec ? JSON.stringify(c.spec, null, 2) : "",
     baseUrl: c.base_url ?? "",
-    url: c.url ?? "",
+    scheme: remote.scheme,
+    host: remote.host,
+    port: remote.port,
+    path: remote.path,
     headersText: c.headers ? JSON.stringify(c.headers, null, 2) : "",
     code: c.code ?? blank.code,
   };
 }
 
 export function McpsView() {
-  const { dataVersion, refresh } = useApp();
-  const [mcps, setMcps] = useState<MCP[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const { data: mcps = [] } = useMcps();
+  const { data: projects = [] } = useProjects();
+  const mutations = useMcpMutations();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<MCP | null>(null);
   const [form, setForm] = useState<FormState>(blank);
   const [saving, setSaving] = useState(false);
   const [preview, setPreview] = useState<{ ok: boolean; tools: ToolPreview[]; error?: string | null } | null>(null);
   const [testing, setTesting] = useState(false);
-
-  useEffect(() => {
-    api.listMcps().then(setMcps).catch(() => {});
-    api.listProjects().then(setProjects).catch(() => {});
-  }, [dataVersion]);
 
   const openNew = () => {
     setEditing(null);
@@ -177,10 +239,9 @@ export function McpsView() {
     if (!form.name.trim()) return;
     setSaving(true);
     try {
-      if (editing) await api.updateMcp(editing.id, payload());
-      else await api.createMcp(payload());
+      if (editing) await mutations.update.mutateAsync({ id: editing.id, body: payload() });
+      else await mutations.create.mutateAsync(payload());
       setOpen(false);
-      refresh();
     } finally {
       setSaving(false);
     }
@@ -188,8 +249,7 @@ export function McpsView() {
 
   const remove = async (m: MCP) => {
     if (!confirm(`Delete MCP “${m.name}”?`)) return;
-    await api.deleteMcp(m.id);
-    refresh();
+    await mutations.remove.mutateAsync(m.id);
   };
 
   // Live preview: OpenAPI parses without saving; remote/code save-then-test.
@@ -208,12 +268,11 @@ export function McpsView() {
       } else {
         // create-or-update first, then hit the live /test endpoint
         const saved = editing
-          ? await api.updateMcp(editing.id, payload())
-          : await api.createMcp(payload());
+          ? await mutations.update.mutateAsync({ id: editing.id, body: payload() })
+          : await mutations.create.mutateAsync(payload());
         if (!editing) setEditing(saved);
         const res = await api.testMcp(saved.id);
         setPreview(res);
-        refresh();
       }
     } catch (e: any) {
       setPreview({ ok: false, tools: [], error: String(e.message ?? e) });
@@ -231,15 +290,17 @@ export function McpsView() {
     }));
 
   const toggleEnabled = async (m: MCP) => {
-    await api.updateMcp(m.id, {
-      name: m.name,
-      description: m.description,
-      type: m.type,
-      enabled: !m.enabled,
-      config: m.config,
-      project_ids: m.project_ids,
+    await mutations.update.mutateAsync({
+      id: m.id,
+      body: {
+        name: m.name,
+        description: m.description,
+        type: m.type,
+        enabled: !m.enabled,
+        config: m.config,
+        project_ids: m.project_ids,
+      },
     });
-    refresh();
   };
 
   return (
@@ -402,13 +463,47 @@ export function McpsView() {
           )}
 
           {form.type === "remote" && (
-            <Field label="MCP server URL" hint="Streamable-HTTP MCP endpoint (JSON-RPC).">
-              <Input
-                value={form.url}
-                onChange={(e) => setForm({ ...form, url: e.target.value })}
-                placeholder="https://my-mcp-server.example.com/mcp"
-              />
-            </Field>
+            <>
+              <div className="grid grid-cols-[110px_1fr_110px] gap-2">
+                <Field label="Scheme">
+                  <Select
+                    value={form.scheme}
+                    onChange={(e) => setForm({ ...form, scheme: e.target.value })}
+                  >
+                    <option value="http">http</option>
+                    <option value="https">https</option>
+                  </Select>
+                </Field>
+                <Field label="Host">
+                  <Input
+                    value={form.host}
+                    onChange={(e) => setForm({ ...form, host: e.target.value })}
+                    placeholder="localhost"
+                  />
+                </Field>
+                <Field label="Port">
+                  <Input
+                    value={form.port}
+                    onChange={(e) => setForm({ ...form, port: e.target.value })}
+                    placeholder="8931"
+                    inputMode="numeric"
+                  />
+                </Field>
+              </div>
+              <Field label="Path" hint="The MCP endpoint path on the server (often /mcp or /sse).">
+                <Input
+                  value={form.path}
+                  onChange={(e) => setForm({ ...form, path: e.target.value })}
+                  placeholder="/mcp"
+                />
+              </Field>
+              <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-[12px]">
+                <span className="text-muted-foreground">Endpoint résolu : </span>
+                <span className="break-all font-mono text-foreground">
+                  {composeRemoteUrl(form) || "—"}
+                </span>
+              </div>
+            </>
           )}
 
           {form.type === "code" && (

@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { FolderKanban, Plus, Pencil, Trash2, MessageSquarePlus, Plug } from "lucide-react";
-import { api, type Project, type MCP, type ProjectInput } from "@/lib/api";
-import { useApp } from "@/lib/store";
+import { type Project, type ProjectInput } from "@/lib/api";
+import { useMcps, useProjectMutations, useProjects } from "@/lib/queries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,18 +20,17 @@ const blank: ProjectInput = {
 };
 
 export function ProjectsView() {
-  const { dataVersion, refresh, startNewChat } = useApp();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [mcps, setMcps] = useState<MCP[]>([]);
+  const navigate = useNavigate();
+  const { data: projects = [] } = useProjects();
+  const { data: mcps = [] } = useMcps();
+  const mutations = useProjectMutations();
   const [editing, setEditing] = useState<Project | null>(null);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<ProjectInput>(blank);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    api.listProjects().then(setProjects).catch(() => {});
-    api.listMcps().then(setMcps).catch(() => {});
-  }, [dataVersion]);
+  const startNewChat = (projectId: number) =>
+    navigate({ to: "/", search: { project: projectId } });
 
   const openNew = () => {
     setEditing(null);
@@ -53,10 +53,9 @@ export function ProjectsView() {
     if (!form.name.trim()) return;
     setSaving(true);
     try {
-      if (editing) await api.updateProject(editing.id, form);
-      else await api.createProject(form);
+      if (editing) await mutations.update.mutateAsync({ id: editing.id, body: form });
+      else await mutations.create.mutateAsync(form);
       setOpen(false);
-      refresh();
     } finally {
       setSaving(false);
     }
@@ -64,8 +63,7 @@ export function ProjectsView() {
 
   const remove = async (p: Project) => {
     if (!confirm(`Delete project “${p.name}”?`)) return;
-    await api.deleteProject(p.id);
-    refresh();
+    await mutations.remove.mutateAsync(p.id);
   };
 
   const toggleMcp = (id: number) =>

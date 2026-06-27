@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from ..db import get_session
-from ..models import Conversation, Message
+from ..models import Conversation, Message, Project
 from ..schemas import ConversationDetail, ConversationOut, MessageOut
 
 router = APIRouter(prefix="/api/conversations", tags=["conversations"])
@@ -33,16 +35,26 @@ def get_conversation(conversation_id: int, session: Session = Depends(get_sessio
     )
 
 
-class RenameIn(BaseModel):
-    title: str
+class ConversationUpdate(BaseModel):
+    title: Optional[str] = None
+    project_id: Optional[int] = None
 
 
 @router.put("/{conversation_id}", response_model=ConversationOut)
-def rename_conversation(conversation_id: int, body: RenameIn, session: Session = Depends(get_session)) -> ConversationOut:
+def update_conversation(
+    conversation_id: int, body: ConversationUpdate, session: Session = Depends(get_session)
+) -> ConversationOut:
     c = session.get(Conversation, conversation_id)
     if not c:
         raise HTTPException(404, "Conversation not found")
-    c.title = body.title.strip() or c.title
+    fields = body.model_fields_set
+    if "title" in fields and body.title is not None:
+        c.title = body.title.strip() or c.title
+    # project_id is explicitly settable to null ("Sans projet")
+    if "project_id" in fields:
+        if body.project_id is not None and not session.get(Project, body.project_id):
+            raise HTTPException(404, "Project not found")
+        c.project_id = body.project_id
     session.add(c)
     session.commit()
     session.refresh(c)
