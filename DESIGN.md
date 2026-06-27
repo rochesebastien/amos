@@ -130,6 +130,11 @@ select, badge, switch, tabs, dropdown). Active nav item:
   and `spinner` for streaming state.
 - `attachment` — staged file previews in the composer (icon/media, metadata,
   upload state, remove action), laid out with `AttachmentGroup`.
+- `message-scroller` — the chat transcript scroller. The scroll behavior
+  (anchored turns, follow-the-live-edge, open-at-last-anchor, jump-to-latest)
+  comes from the headless `@shadcn/react` package; the file in `components/ui/`
+  is the styled frame themed to the CheveluAI tokens. Installs with
+  `legacy-peer-deps` (see `.npmrc`) since the project is on React 18.
 
 ## Animation
 

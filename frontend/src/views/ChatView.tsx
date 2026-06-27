@@ -29,6 +29,14 @@ import {
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker";
 import {
+  MessageScroller,
+  MessageScrollerButton,
+  MessageScrollerContent,
+  MessageScrollerItem,
+  MessageScrollerProvider,
+  MessageScrollerViewport,
+} from "@/components/ui/message-scroller";
+import {
   Attachment,
   AttachmentAction,
   AttachmentActions,
@@ -103,7 +111,6 @@ export function ChatView() {
   const [attachments, setAttachments] = useState<StagedFile[]>([]);
   const [streaming, setStreaming] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const title = conversation?.title ?? "New chat";
@@ -123,10 +130,6 @@ export function ChatView() {
       setProjectId(conversation.project_id);
     }
   }, [conversation]);
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [messages]);
 
   // ----- attachments -----
   const onPickFiles = async (files: FileList | null) => {
@@ -281,9 +284,9 @@ export function ChatView() {
       </header>
 
       {/* messages */}
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-3xl px-6 py-6">
-          {empty ? (
+      {empty ? (
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-3xl px-6 py-6">
             <div className="flex flex-col items-center justify-center gap-3 pt-[14vh] text-center">
               <div className="flex size-12 items-center justify-center rounded-xl bg-primary/15 text-primary">
                 <Sparkles className="size-6" />
@@ -295,19 +298,35 @@ export function ChatView() {
                   : "Pick a project to use its pre-prompt and MCP tools, or just start typing."}
               </p>
             </div>
-          ) : (
-            <div className="flex flex-col gap-6">
-              {messages.map((m, i) => (
-                <ChatMessage
-                  key={i}
-                  msg={m}
-                  streaming={streaming && i === messages.length - 1}
-                />
-              ))}
-            </div>
-          )}
+          </div>
         </div>
-      </div>
+      ) : (
+        <MessageScrollerProvider
+          autoScroll
+          defaultScrollPosition="last-anchor"
+          scrollPreviousItemPeek={64}
+        >
+          <MessageScroller>
+            <MessageScrollerViewport>
+              <MessageScrollerContent className="gap-6 px-6 py-6" aria-busy={streaming}>
+                {messages.map((m, i) => (
+                  <MessageScrollerItem
+                    key={i}
+                    messageId={String(i)}
+                    scrollAnchor={m.role === "user"}
+                  >
+                    <ChatMessage
+                      msg={m}
+                      streaming={streaming && i === messages.length - 1}
+                    />
+                  </MessageScrollerItem>
+                ))}
+              </MessageScrollerContent>
+            </MessageScrollerViewport>
+            <MessageScrollerButton />
+          </MessageScroller>
+        </MessageScrollerProvider>
+      )}
 
       {/* composer */}
       <div className="border-t border-border px-6 py-4">
