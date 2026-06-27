@@ -120,6 +120,22 @@ select, badge, switch, tabs, dropdown). Active nav item:
 `bg-sidebar-accent font-medium`, icon `text-primary`. Focus:
 `border-ring ring-1 ring-ring`.
 
+**AI components.** The chat surface uses the shadcn AI-usage components, also in
+`components/ui/`, themed to the CheveluAI palette:
+
+- `message` — row layout (avatar, alignment, header, footer) for a turn.
+- `bubble` — the framed message surface (variants incl. `ghost` for assistant
+  markdown, `tinted` for the user, `destructive` for errors).
+- `marker` — inline status / tool-call rows; pairs with the `shimmer` utility
+  and `spinner` for streaming state.
+- `attachment` — staged file previews in the composer (icon/media, metadata,
+  upload state, remove action), laid out with `AttachmentGroup`.
+- `message-scroller` — the chat transcript scroller. The scroll behavior
+  (anchored turns, follow-the-live-edge, open-at-last-anchor, jump-to-latest)
+  comes from the headless `@shadcn/react` package; the file in `components/ui/`
+  is the styled frame themed to the CheveluAI tokens. Installs with
+  `legacy-peer-deps` (see `.npmrc`) since the project is on React 18.
+
 ## Animation
 
 Entrance `animate-in`; hover/focus ~120–200ms `ease`. No bouncy easings, no

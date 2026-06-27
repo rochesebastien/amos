@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Plug, RefreshCw, CheckCircle2, XCircle, Monitor, Moon, Sun } from "lucide-react";
-import { api, type Settings } from "@/lib/api";
+import { api } from "@/lib/api";
 import { useApp, type ThemeMode } from "@/lib/store";
+import { useSettings, useSettingsMutation } from "@/lib/queries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field, Select } from "@/components/ui/select";
@@ -9,7 +10,8 @@ import { cn } from "@/lib/utils";
 
 export function SettingsView() {
   const { theme, setTheme } = useApp();
-  const [settings, setSettings] = useState<Settings | null>(null);
+  const { data: settings } = useSettings();
+  const settingsMutation = useSettingsMutation();
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState("");
@@ -20,21 +22,20 @@ export function SettingsView() {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // seed the form once settings load from the server
   useEffect(() => {
-    api.getSettings().then((s) => {
-      setSettings(s);
-      setBaseUrl(s.llm_base_url);
-      setModel(s.llm_model);
-      setMaxIters(s.max_tool_iterations);
-    });
-  }, []);
+    if (!settings) return;
+    setBaseUrl(settings.llm_base_url);
+    setModel(settings.llm_model);
+    setMaxIters(settings.max_tool_iterations);
+  }, [settings]);
 
   const discover = async () => {
     setDiscovering(true);
     setDiscoverErr("");
     try {
       // persist base url + key first so the backend can reach the gateway
-      await api.updateSettings({
+      await settingsMutation.mutateAsync({
         llm_base_url: baseUrl,
         ...(apiKey ? { llm_api_key: apiKey } : {}),
       });
@@ -58,8 +59,7 @@ export function SettingsView() {
         max_tool_iterations: maxIters,
       };
       if (apiKey) body.llm_api_key = apiKey;
-      const s = await api.updateSettings(body);
-      setSettings(s);
+      await settingsMutation.mutateAsync(body);
       setApiKey("");
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);

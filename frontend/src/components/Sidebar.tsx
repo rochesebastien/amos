@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   MessageSquarePlus,
   MessagesSquare,
@@ -19,15 +21,16 @@ import {
   ArrowDownUp,
   Check,
 } from "lucide-react";
-import { api, type Conversation, type Project } from "@/lib/api";
-import { useApp, type View } from "@/lib/store";
+import { api, type Conversation } from "@/lib/api";
+import { useApp } from "@/lib/store";
+import { qk, useConversations, useProjects } from "@/lib/queries";
 import { useSidebar, type ProjectSort, SIDEBAR_RAIL } from "@/lib/sidebar";
 import { cn } from "@/lib/utils";
 
-const NAV: { view: View; label: string; icon: React.ElementType }[] = [
-  { view: "chat", label: "Chat", icon: MessagesSquare },
-  { view: "projects", label: "Projects", icon: FolderKanban },
-  { view: "mcps", label: "MCPs", icon: Plug },
+const NAV: { to: string; label: string; icon: React.ElementType }[] = [
+  { to: "/", label: "Chat", icon: MessagesSquare },
+  { to: "/projects", label: "Projects", icon: FolderKanban },
+  { to: "/mcps", label: "MCPs", icon: Plug },
 ];
 
 const NO_PROJECT = -1;
@@ -47,22 +50,21 @@ function relativeTime(iso: string): string {
 }
 
 export function Sidebar() {
-  const {
-    view,
-    setView,
-    activeConversationId,
-    setActiveConversation,
-    startNewChat,
-    theme,
-    setTheme,
-    dataVersion,
-    refresh,
-  } = useApp();
+  const { theme, setTheme } = useApp();
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  const isChat = pathname === "/" || pathname.startsWith("/c/");
+  const activeConversationId = pathname.startsWith("/c/")
+    ? Number(pathname.split("/")[2])
+    : null;
+
   const { width, collapsed, sort, folded, setWidth, setCollapsed, toggle, setSort, toggleFold } =
     useSidebar();
 
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const { data: conversations = [] } = useConversations();
+  const { data: projects = [] } = useProjects();
   const [sortOpen, setSortOpen] = useState(false);
 
   // inline editing
@@ -75,10 +77,13 @@ export function Sidebar() {
   const draggedConv = useRef<number | null>(null);
   const [dropTarget, setDropTarget] = useState<number | null>(null);
 
-  useEffect(() => {
-    api.listConversations().then(setConversations).catch(() => setConversations([]));
-    api.listProjects().then(setProjects).catch(() => setProjects([]));
-  }, [dataVersion]);
+  const startNewChat = (projectId?: number | null) =>
+    navigate({ to: "/", search: projectId ? { project: projectId } : {} });
+  const openConversation = (id: number) =>
+    navigate({ to: "/c/$conversationId", params: { conversationId: String(id) } });
+  const refreshConversations = () => qc.invalidateQueries({ queryKey: qk.conversations });
+
+  const isNavActive = (to: string) => (to === "/" ? isChat : pathname === to);
 
   // ----- drag to resize -----
   const onDragStart = (e: React.MouseEvent) => {
@@ -108,14 +113,16 @@ export function Sidebar() {
 
   const removeConversation = async (e: React.MouseEvent, id: number) => {
     e.stopPropagation();
+    e.preventDefault();
     await api.deleteConversation(id);
     if (activeConversationId === id) startNewChat();
-    refresh();
+    refreshConversations();
   };
 
   // ----- conversation rename -----
   const startConvRename = (e: React.MouseEvent, c: Conversation) => {
     e.stopPropagation();
+    e.preventDefault();
     setEditConvId(c.id);
     setEditConvValue(c.title);
   };
@@ -127,15 +134,15 @@ export function Sidebar() {
     const current = conversations.find((c) => c.id === id);
     if (value && current && value !== current.title) {
       await api.renameConversation(id, value);
-      refresh();
+      refreshConversations();
     }
   };
 
   // ----- project rename -----
-  const startProjRename = (e: React.MouseEvent, p: Project) => {
+  const startProjRename = (e: React.MouseEvent, id: number, name: string) => {
     e.stopPropagation();
-    setEditProjId(p.id);
-    setEditProjValue(p.name);
+    setEditProjId(id);
+    setEditProjValue(name);
   };
   const commitProjRename = async () => {
     if (editProjId == null) return;
@@ -151,7 +158,7 @@ export function Sidebar() {
         model: p.model,
         mcp_ids: p.mcp_ids,
       });
-      refresh();
+      qc.invalidateQueries({ queryKey: qk.projects });
     }
   };
 
@@ -165,9 +172,11 @@ export function Sidebar() {
     const target = groupId === NO_PROJECT ? null : groupId;
     if (!conv || conv.project_id === target) return;
     // optimistic
-    setConversations((cs) => cs.map((c) => (c.id === convId ? { ...c, project_id: target } : c)));
+    qc.setQueryData<Conversation[]>(qk.conversations, (cs) =>
+      (cs ?? []).map((c) => (c.id === convId ? { ...c, project_id: target } : c)),
+    );
     await api.updateConversation(convId, { project_id: target });
-    refresh();
+    refreshConversations();
   };
 
   // ----- group + sort -----
@@ -218,30 +227,34 @@ export function Sidebar() {
           <MessageSquarePlus className="size-4 text-primary" />
         </button>
         <div className="my-1 h-px w-6 bg-sidebar-border" />
-        {NAV.map(({ view: v, label, icon: Icon }) => (
-          <button
-            key={v}
-            onClick={() => setView(v)}
+        {NAV.map(({ to, label, icon: Icon }) => (
+          <Link
+            key={to}
+            to={to}
             title={label}
             className={cn(
               "flex size-9 items-center justify-center rounded-lg transition-colors",
-              view === v ? "bg-sidebar-accent text-primary" : "text-muted-foreground hover:bg-sidebar-accent/60",
+              isNavActive(to)
+                ? "bg-sidebar-accent text-primary"
+                : "text-muted-foreground hover:bg-sidebar-accent/60",
             )}
           >
             <Icon className="size-4" />
-          </button>
+          </Link>
         ))}
         <div className="flex-1" />
-        <button
-          onClick={() => setView("settings")}
+        <Link
+          to="/settings"
           title="Settings"
           className={cn(
             "flex size-9 items-center justify-center rounded-lg transition-colors",
-            view === "settings" ? "bg-sidebar-accent text-primary" : "text-muted-foreground hover:bg-sidebar-accent/60",
+            pathname === "/settings"
+              ? "bg-sidebar-accent text-primary"
+              : "text-muted-foreground hover:bg-sidebar-accent/60",
           )}
         >
           <SettingsIcon className="size-4" />
-        </button>
+        </Link>
         <button
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           title="Toggle theme"
@@ -287,12 +300,12 @@ export function Sidebar() {
 
       {/* nav */}
       <nav className="flex flex-col gap-0.5 px-3 py-1.5">
-        {NAV.map(({ view: v, label, icon: Icon }) => {
-          const active = view === v;
+        {NAV.map(({ to, label, icon: Icon }) => {
+          const active = isNavActive(to);
           return (
-            <button
-              key={v}
-              onClick={() => setView(v)}
+            <Link
+              key={to}
+              to={to}
               className={cn(
                 "flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors",
                 active
@@ -302,7 +315,7 @@ export function Sidebar() {
             >
               <Icon className={cn("size-4", active && "text-primary")} />
               {label}
-            </button>
+            </Link>
           );
         })}
       </nav>
@@ -405,9 +418,7 @@ export function Sidebar() {
                   ) : (
                     <button
                       onClick={() => toggleFold(g.id)}
-                      onDoubleClick={(e) =>
-                        !isOrphan && startProjRename(e, projects.find((p) => p.id === g.id)!)
-                      }
+                      onDoubleClick={(e) => !isOrphan && startProjRename(e, g.id, g.name)}
                       className="min-w-0 flex-1 truncate text-left font-medium"
                       title={isOrphan ? undefined : "Double-click to rename"}
                     >
@@ -433,7 +444,7 @@ export function Sidebar() {
                       </p>
                     ) : (
                       g.convs.map((c) => {
-                        const active = view === "chat" && activeConversationId === c.id;
+                        const active = isChat && activeConversationId === c.id;
                         const editing = editConvId === c.id;
                         return (
                           <div
@@ -444,7 +455,7 @@ export function Sidebar() {
                               draggedConv.current = null;
                               setDropTarget(null);
                             }}
-                            onClick={() => !editing && setActiveConversation(c.id)}
+                            onClick={() => !editing && openConversation(c.id)}
                             onDoubleClick={(e) => startConvRename(e, c)}
                             className={cn(
                               "group flex cursor-pointer items-center gap-2 rounded-md py-1.5 pl-7 pr-2 text-left text-[13px] transition-colors",
@@ -498,16 +509,18 @@ export function Sidebar() {
 
       {/* foot */}
       <div className="flex items-center gap-1 border-t border-sidebar-border px-3 py-3">
-        <button
-          onClick={() => setView("settings")}
+        <Link
+          to="/settings"
           className={cn(
             "flex flex-1 items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
-            view === "settings" ? "bg-sidebar-accent font-semibold" : "text-muted-foreground hover:bg-sidebar-accent/60",
+            pathname === "/settings"
+              ? "bg-sidebar-accent font-semibold"
+              : "text-muted-foreground hover:bg-sidebar-accent/60",
           )}
         >
-          <SettingsIcon className={cn("size-4", view === "settings" && "text-primary")} />
+          <SettingsIcon className={cn("size-4", pathname === "/settings" && "text-primary")} />
           Settings
-        </button>
+        </Link>
         <button
           title="Toggle theme"
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}

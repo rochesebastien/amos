@@ -181,6 +181,28 @@
   animation: slide-in-right 0.18s ease;
 }
 
+/* Shimmer — streaming/loading text effect for Marker & Attachment */
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-muted-foreground) 0%,
+    var(--color-muted-foreground) 40%,
+    var(--color-foreground) 50%,
+    var(--color-muted-foreground) 60%,
+    var(--color-muted-foreground) 100%
+  );
+  background-size: 200% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: shimmer 1.6s linear infinite;
+}
+
 /* ------------------------------------------------------------- Scrollbars */
 * {
   scrollbar-width: thin;
