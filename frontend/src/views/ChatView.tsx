@@ -14,7 +14,6 @@ import {
   Folder,
   Plug,
   ChevronDown,
-  Cpu,
 } from "lucide-react";
 import { streamChat, type Message, type ChatEvent } from "@/lib/api";
 import { qk, useConversation, useProjects, useMcps, useSettings } from "@/lib/queries";
@@ -457,7 +456,7 @@ export function ChatView() {
             </AttachmentGroup>
           )}
 
-          <div className="flex flex-col gap-1.5 rounded-xl border border-input bg-card p-2 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30">
+          <div className="flex items-end gap-2 rounded-xl border border-input bg-card p-2 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30">
             <input
               ref={fileRef}
               type="file"
@@ -468,92 +467,89 @@ export function ChatView() {
                 e.target.value = "";
               }}
             />
-            <div className="flex items-end gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => fileRef.current?.click()}
+                >
+                  <Paperclip className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{t("chat.attachFiles")}</TooltipContent>
+            </Tooltip>
+
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={onKeyDown}
+              rows={1}
+              placeholder={t("chat.sendPlaceholder")}
+              className="max-h-48 min-h-[36px] flex-1 resize-none bg-transparent px-1 py-1.5 text-sm outline-none placeholder:text-muted-foreground"
+            />
+
+            {/* model selector — text dropdown, to the left of the send button */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex h-9 max-w-[180px] items-center gap-1 rounded-lg px-2 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  <span className="truncate">{effectiveModel || t("chat.model")}</span>
+                  <ChevronDown className="size-3.5 shrink-0" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel>{t("chat.model")}</DropdownMenuLabel>
+                {modelOptions.length === 0 ? (
+                  <div className="px-2 py-1.5 text-[13px] text-muted-foreground">
+                    {t("chat.noModelHint")}
+                  </div>
+                ) : (
+                  modelOptions.map((id) => (
+                    <DropdownMenuItem key={id} onSelect={() => setSelectedModel(id)}>
+                      <Check
+                        className={cn(
+                          "size-3.5 shrink-0 text-primary",
+                          effectiveModel === id ? "opacity-100" : "opacity-0",
+                        )}
+                      />
+                      <span className="flex-1 truncate">{id}</span>
+                      {id === defaultModel && (
+                        <span className="shrink-0 text-[11px] text-muted-foreground">
+                          {t("settings.default")}
+                        </span>
+                      )}
+                    </DropdownMenuItem>
+                  ))
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {streaming ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button size="icon" variant="secondary" onClick={stop}>
+                    <Square className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{t("chat.stop")}</TooltipContent>
+              </Tooltip>
+            ) : (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     size="icon"
-                    variant="ghost"
-                    onClick={() => fileRef.current?.click()}
+                    onClick={send}
+                    disabled={!input.trim() && attachments.length === 0}
                   >
-                    <Paperclip className="size-4" />
+                    <ArrowUp className="size-4" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>{t("chat.attachFiles")}</TooltipContent>
+                <TooltipContent>{t("chat.send")}</TooltipContent>
               </Tooltip>
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={onKeyDown}
-                rows={1}
-                placeholder={t("chat.sendPlaceholder")}
-                className="max-h-48 min-h-[36px] flex-1 resize-none bg-transparent px-1 py-1.5 text-sm outline-none placeholder:text-muted-foreground"
-              />
-              {streaming ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button size="icon" variant="secondary" onClick={stop}>
-                      <Square className="size-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>{t("chat.stop")}</TooltipContent>
-                </Tooltip>
-              ) : (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      size="icon"
-                      onClick={send}
-                      disabled={!input.trim() && attachments.length === 0}
-                    >
-                      <ArrowUp className="size-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>{t("chat.send")}</TooltipContent>
-                </Tooltip>
-              )}
-            </div>
-
-            {/* composer toolbar — model selector */}
-            <div className="flex items-center gap-2 pl-1">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className="flex h-7 max-w-[240px] items-center gap-1.5 rounded-lg border border-input bg-card px-2.5 text-[12px] text-muted-foreground transition-colors hover:bg-accent"
-                  >
-                    <Cpu className="size-3.5 text-primary" />
-                    <span className="truncate">{effectiveModel || t("chat.noModel")}</span>
-                    <ChevronDown className="size-3.5 shrink-0" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-64">
-                  <DropdownMenuLabel>{t("chat.model")}</DropdownMenuLabel>
-                  {modelOptions.length === 0 ? (
-                    <div className="px-2 py-1.5 text-[13px] text-muted-foreground">
-                      {t("chat.noModelHint")}
-                    </div>
-                  ) : (
-                    modelOptions.map((id) => (
-                      <DropdownMenuItem key={id} onSelect={() => setSelectedModel(id)}>
-                        <Check
-                          className={cn(
-                            "size-3.5 shrink-0 text-primary",
-                            effectiveModel === id ? "opacity-100" : "opacity-0",
-                          )}
-                        />
-                        <span className="flex-1 truncate">{id}</span>
-                        {id === defaultModel && (
-                          <span className="shrink-0 text-[11px] text-muted-foreground">
-                            {t("settings.default")}
-                          </span>
-                        )}
-                      </DropdownMenuItem>
-                    ))
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+            )}
           </div>
           <p className="mt-2 text-center text-[11px] text-muted-foreground/60">
             {t("chat.disclaimer")}

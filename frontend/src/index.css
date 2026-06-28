@@ -141,17 +141,18 @@
     font-family: var(--font-sans);
     font-weight: 500; /* Mona Sans Medium for normal text */
     font-size: 15px;
+    letter-spacing: -0.015em; /* tighter, grotesque-style tracking */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  /* Large / display text uses Mona Sans ExtraBold */
+  /* Large / display text uses Mona Sans ExtraBold with tight tracking */
   .font-display,
   h1,
   h2,
   h3 {
     font-family: var(--font-display);
     font-weight: 800;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.045em;
   }
 }
 
