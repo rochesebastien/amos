@@ -77,9 +77,15 @@ async def _event_stream(body: ChatIn) -> AsyncIterator[str]:
         session.add(conv)
         session.commit()
 
-        # build LLM config
-        llm_cfg = cfg.get_llm_config(session)
-        model = (project.model if project and project.model else "") or llm_cfg.model
+        # build LLM config — resolve the per-model connection override if any.
+        # precedence: explicit per-message pick > project override > default.
+        default_model = cfg.get_setting(session, "llm_model", "")
+        model = (
+            (body.model or "").strip()
+            or (project.model if project and project.model else "")
+            or default_model
+        )
+        llm_cfg = cfg.get_llm_config_for_model(session, model)
         if not llm_cfg.configured:
             yield _sse({"type": "error", "error": "No model configured. Open Settings and connect your LiteLLM endpoint."})
             return

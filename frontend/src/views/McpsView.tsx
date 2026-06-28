@@ -10,6 +10,7 @@ import {
   FlaskConical,
   CheckCircle2,
   XCircle,
+  RefreshCw,
 } from "lucide-react";
 import {
   api,
@@ -26,12 +27,16 @@ import { Modal } from "@/components/ui/modal";
 import { Field, Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { useConfirm } from "@/components/ui/confirm";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-const TYPE_META: Record<MCPType, { label: string; icon: React.ElementType; blurb: string }> = {
-  openapi: { label: "OpenAPI", icon: FileJson, blurb: "Generate tools on the fly from an openapi.json (e.g. FastAPI)." },
-  remote: { label: "Remote", icon: Globe, blurb: "Connect to an existing MCP server over HTTP." },
-  code: { label: "Code", icon: Code2, blurb: "Define tools with your own Python." },
+const TYPE_ICON: Record<MCPType, React.ElementType> = {
+  openapi: FileJson,
+  remote: Globe,
+  code: Code2,
 };
 
 type FormState = {
@@ -203,9 +208,11 @@ function mcpToForm(m: MCP): FormState {
 }
 
 export function McpsView() {
+  const t = useT();
   const { data: mcps = [] } = useMcps();
   const { data: projects = [] } = useProjects();
   const mutations = useMcpMutations();
+  const confirm = useConfirm();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<MCP | null>(null);
   const [form, setForm] = useState<FormState>(blank);
@@ -248,7 +255,13 @@ export function McpsView() {
   };
 
   const remove = async (m: MCP) => {
-    if (!confirm(`Delete MCP “${m.name}”?`)) return;
+    const ok = await confirm({
+      title: t("mcps.deleteTitle"),
+      description: t("mcps.deleteDescription", { name: m.name }),
+      confirmText: t("common.delete"),
+      destructive: true,
+    });
+    if (!ok) return;
     await mutations.remove.mutateAsync(m.id);
   };
 
@@ -307,13 +320,13 @@ export function McpsView() {
     <div className="flex min-w-0 flex-1 flex-col">
       <header className="flex items-center justify-between gap-4 px-6 pt-8 pb-4">
         <div>
-          <h1 className="text-3xl font-display">MCPs</h1>
+          <h1 className="text-3xl font-display">{t("nav.mcps")}</h1>
           <p className="mt-1 text-sm text-muted-foreground/70">
-            Tools you can attach to projects — from a URL, your own code, or any OpenAPI spec.
+            {t("mcps.subtitle")}
           </p>
         </div>
         <Button onClick={openNew}>
-          <Plus className="size-4" /> New MCP
+          <Plus className="size-4" /> {t("mcps.newMcp")}
         </Button>
       </header>
 
@@ -323,8 +336,7 @@ export function McpsView() {
         ) : (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
             {mcps.map((m) => {
-              const meta = TYPE_META[m.type];
-              const Icon = meta.icon;
+              const Icon = TYPE_ICON[m.type];
               return (
                 <div
                   key={m.id}
@@ -336,12 +348,22 @@ export function McpsView() {
                       <h3 className="font-display text-base">{m.name}</h3>
                     </div>
                     <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                      <Button size="icon" variant="ghost" onClick={() => openEdit(m)}>
-                        <Pencil className="size-3.5" />
-                      </Button>
-                      <Button size="icon" variant="ghost" onClick={() => remove(m)}>
-                        <Trash2 className="size-3.5" />
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button size="icon" variant="ghost" onClick={() => openEdit(m)}>
+                            <Pencil className="size-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>{t("mcps.edit")}</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button size="icon" variant="ghost" onClick={() => remove(m)}>
+                            <Trash2 className="size-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>{t("common.delete")}</TooltipContent>
+                      </Tooltip>
                     </div>
                   </div>
                   {m.description && (
@@ -350,17 +372,18 @@ export function McpsView() {
                     </p>
                   )}
                   <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                    <Badge variant="outline">{meta.label}</Badge>
+                    <Badge variant="outline">{t(`mcps.type.${m.type}.label`)}</Badge>
                     {m.project_ids.length > 0 && (
                       <Badge variant="primary">
-                        {m.project_ids.length} project{m.project_ids.length > 1 ? "s" : ""}
+                        {m.project_ids.length}{" "}
+                        {t(m.project_ids.length > 1 ? "mcps.projects" : "mcps.project")}
                       </Badge>
                     )}
                   </div>
                   <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
                     <label className="flex items-center gap-2 text-[13px] text-muted-foreground">
                       <Switch checked={m.enabled} onCheckedChange={() => toggleEnabled(m)} />
-                      {m.enabled ? "Enabled" : "Disabled"}
+                      {m.enabled ? t("mcps.enabled") : t("mcps.disabled")}
                     </label>
                     <TestButton mcp={m} />
                   </div>
@@ -374,18 +397,18 @@ export function McpsView() {
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title={editing ? "Edit MCP" : "New MCP"}
+        title={editing ? t("mcps.editMcp") : t("mcps.newMcp")}
         className="max-w-2xl"
         footer={
           <>
             <Button variant="ghost" onClick={() => setOpen(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button variant="outline" onClick={runPreview} disabled={testing}>
-              <FlaskConical className="size-4" /> {testing ? "Testing…" : "Preview tools"}
+              <FlaskConical className="size-4" /> {testing ? t("mcps.testing") : t("mcps.previewTools")}
             </Button>
             <Button onClick={save} disabled={saving || !form.name.trim()}>
-              {saving ? "Saving…" : "Save"}
+              {saving ? t("common.saving") : t("common.save")}
             </Button>
           </>
         }
@@ -393,16 +416,15 @@ export function McpsView() {
         <div className="flex max-h-[62vh] flex-col gap-4 overflow-y-auto pr-1">
           {/* type picker */}
           <div className="grid grid-cols-3 gap-2">
-            {(Object.keys(TYPE_META) as MCPType[]).map((t) => {
-              const meta = TYPE_META[t];
-              const Icon = meta.icon;
-              const active = form.type === t;
+            {(Object.keys(TYPE_ICON) as MCPType[]).map((type) => {
+              const Icon = TYPE_ICON[type];
+              const active = form.type === type;
               return (
                 <button
-                  key={t}
+                  key={type}
                   type="button"
                   onClick={() => {
-                    setForm({ ...form, type: t });
+                    setForm({ ...form, type });
                     setPreview(null);
                   }}
                   className={cn(
@@ -411,39 +433,41 @@ export function McpsView() {
                   )}
                 >
                   <Icon className={cn("size-4", active && "text-primary")} />
-                  <span className="text-sm font-semibold">{meta.label}</span>
-                  <span className="text-[11px] leading-tight text-muted-foreground">{meta.blurb}</span>
+                  <span className="text-sm font-semibold">{t(`mcps.type.${type}.label`)}</span>
+                  <span className="text-[11px] leading-tight text-muted-foreground">
+                    {t(`mcps.type.${type}.blurb`)}
+                  </span>
                 </button>
               );
             })}
           </div>
 
-          <Field label="Name">
+          <Field label={t("mcps.name")}>
             <Input
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="My API tools"
+              placeholder={t("mcps.namePlaceholder")}
               autoFocus
             />
           </Field>
-          <Field label="Description">
+          <Field label={t("mcps.description")}>
             <Input
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
-              placeholder="Optional"
+              placeholder={t("mcps.optional")}
             />
           </Field>
 
           {form.type === "openapi" && (
             <>
-              <Field label="OpenAPI spec URL" hint="e.g. http://localhost:8000/openapi.json — fetched when tools run.">
+              <Field label={t("mcps.specUrl")} hint={t("mcps.specUrlHint")}>
                 <Input
                   value={form.specUrl}
                   onChange={(e) => setForm({ ...form, specUrl: e.target.value })}
                   placeholder="https://api.example.com/openapi.json"
                 />
               </Field>
-              <Field label="…or paste the spec JSON" hint="Used if no URL is set (or to pin a fixed version).">
+              <Field label={t("mcps.specText")} hint={t("mcps.specTextHint")}>
                 <Textarea
                   value={form.specText}
                   onChange={(e) => setForm({ ...form, specText: e.target.value })}
@@ -452,7 +476,7 @@ export function McpsView() {
                   className="font-mono text-[12px]"
                 />
               </Field>
-              <Field label="Base URL override" hint="Where requests are sent. Defaults to the spec's servers / the URL origin.">
+              <Field label={t("mcps.baseUrl")} hint={t("mcps.baseUrlHint")}>
                 <Input
                   value={form.baseUrl}
                   onChange={(e) => setForm({ ...form, baseUrl: e.target.value })}
@@ -465,7 +489,7 @@ export function McpsView() {
           {form.type === "remote" && (
             <>
               <div className="grid grid-cols-[110px_1fr_110px] gap-2">
-                <Field label="Scheme">
+                <Field label={t("mcps.scheme")}>
                   <Select
                     value={form.scheme}
                     onChange={(e) => setForm({ ...form, scheme: e.target.value })}
@@ -474,14 +498,14 @@ export function McpsView() {
                     <option value="https">https</option>
                   </Select>
                 </Field>
-                <Field label="Host">
+                <Field label={t("mcps.host")}>
                   <Input
                     value={form.host}
                     onChange={(e) => setForm({ ...form, host: e.target.value })}
                     placeholder="localhost"
                   />
                 </Field>
-                <Field label="Port">
+                <Field label={t("mcps.port")}>
                   <Input
                     value={form.port}
                     onChange={(e) => setForm({ ...form, port: e.target.value })}
@@ -490,7 +514,7 @@ export function McpsView() {
                   />
                 </Field>
               </div>
-              <Field label="Path" hint="The MCP endpoint path on the server (often /mcp or /sse).">
+              <Field label={t("mcps.path")} hint={t("mcps.pathHint")}>
                 <Input
                   value={form.path}
                   onChange={(e) => setForm({ ...form, path: e.target.value })}
@@ -498,7 +522,7 @@ export function McpsView() {
                 />
               </Field>
               <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-[12px]">
-                <span className="text-muted-foreground">Endpoint résolu : </span>
+                <span className="text-muted-foreground">{t("mcps.resolvedEndpoint")} </span>
                 <span className="break-all font-mono text-foreground">
                   {composeRemoteUrl(form) || "—"}
                 </span>
@@ -507,7 +531,7 @@ export function McpsView() {
           )}
 
           {form.type === "code" && (
-            <Field label="Python code" hint="Define TOOLS (list) and call(name, arguments). Runs in-process.">
+            <Field label={t("mcps.pythonCode")} hint={t("mcps.pythonCodeHint")}>
               <Textarea
                 value={form.code}
                 onChange={(e) => setForm({ ...form, code: e.target.value })}
@@ -518,7 +542,7 @@ export function McpsView() {
           )}
 
           {form.type !== "code" && (
-            <Field label="Headers (JSON)" hint="Optional auth headers sent with each request.">
+            <Field label={t("mcps.headers")} hint={t("mcps.headersHint")}>
               <Textarea
                 value={form.headersText}
                 onChange={(e) => setForm({ ...form, headersText: e.target.value })}
@@ -531,9 +555,9 @@ export function McpsView() {
 
           {/* attach to projects */}
           <div className="flex flex-col gap-1.5">
-            <span className="text-[13px] text-muted-foreground">Attach to projects</span>
+            <span className="text-[13px] text-muted-foreground">{t("mcps.attachProjects")}</span>
             {projects.length === 0 ? (
-              <p className="text-[13px] text-muted-foreground/70">No projects yet.</p>
+              <p className="text-[13px] text-muted-foreground/70">{t("mcps.noProjects")}</p>
             ) : (
               <div className="flex flex-wrap gap-1.5">
                 {projects.map((p) => {
@@ -568,14 +592,24 @@ export function McpsView() {
                 <>
                   <div className="mb-2 flex items-center gap-2 font-semibold text-foreground">
                     <CheckCircle2 className="size-4 text-primary" />
-                    {preview.tools.length} tool{preview.tools.length === 1 ? "" : "s"} generated
+                    {preview.tools.length}{" "}
+                    {t(preview.tools.length === 1 ? "mcps.toolGenerated" : "mcps.toolsGenerated")}
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {preview.tools.map((t) => (
-                      <Badge key={t.name} variant="secondary" title={t.description}>
-                        {t.name}
-                      </Badge>
-                    ))}
+                    {preview.tools.map((t) =>
+                      t.description ? (
+                        <Tooltip key={t.name}>
+                          <TooltipTrigger asChild>
+                            <Badge variant="secondary">{t.name}</Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>{t.description}</TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <Badge key={t.name} variant="secondary">
+                          {t.name}
+                        </Badge>
+                      ),
+                    )}
                   </div>
                 </>
               ) : (
@@ -593,8 +627,9 @@ export function McpsView() {
 }
 
 function TestButton({ mcp }: { mcp: MCP }) {
+  const t = useT();
   const [state, setState] = useState<"idle" | "loading" | "ok" | "err">("idle");
-  const [count, setCount] = useState(0);
+  const [tools, setTools] = useState<ToolPreview[]>([]);
   const [msg, setMsg] = useState("");
 
   const run = async () => {
@@ -602,7 +637,7 @@ function TestButton({ mcp }: { mcp: MCP }) {
     try {
       const res = await api.testMcp(mcp.id);
       if (res.ok) {
-        setCount(res.tools.length);
+        setTools(res.tools);
         setState("ok");
       } else {
         setMsg(res.error ?? "failed");
@@ -614,10 +649,10 @@ function TestButton({ mcp }: { mcp: MCP }) {
     }
   };
 
-  return (
+  const button = (
     <button
       onClick={run}
-      title={state === "err" ? msg : "Test connection"}
+      title={state === "err" ? msg : state === "ok" ? undefined : t("mcps.testConnection")}
       className={cn(
         "flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px] font-medium transition-colors hover:bg-accent",
         state === "ok" && "text-primary",
@@ -634,24 +669,73 @@ function TestButton({ mcp }: { mcp: MCP }) {
       ) : (
         <FlaskConical className="size-3.5" />
       )}
-      {state === "ok" ? `${count} tools` : state === "err" ? "error" : "Test"}
+      {state === "ok"
+        ? `${tools.length} ${t(tools.length === 1 ? "mcps.tool" : "mcps.tools")}`
+        : state === "err"
+          ? t("mcps.error")
+          : t("mcps.checkTools")}
     </button>
+  );
+
+  if (state !== "ok") return button;
+
+  return (
+    <HoverCard>
+      <HoverCardTrigger asChild>{button}</HoverCardTrigger>
+      <HoverCardContent align="end" className="w-80 max-w-[20rem]">
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[12px] font-medium text-muted-foreground">
+              {tools.length} {t(tools.length === 1 ? "mcps.tool" : "mcps.tools")}
+            </p>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={run}
+                  className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  <RefreshCw className="size-3" /> {t("mcps.refresh")}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>{t("mcps.refreshTools")}</TooltipContent>
+            </Tooltip>
+          </div>
+          {tools.length === 0 ? (
+            <p className="text-[13px] text-muted-foreground">{t("mcps.noToolsExposed")}</p>
+          ) : (
+            <ul className="flex max-h-64 flex-col gap-2 overflow-y-auto pr-1">
+              {tools.map((t) => (
+                <li key={t.name} className="flex flex-col gap-0.5">
+                  <code className="font-mono text-[12px] font-medium text-foreground">{t.name}</code>
+                  {t.description && (
+                    <span className="line-clamp-2 text-[12px] text-muted-foreground">
+                      {t.description}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </HoverCardContent>
+    </HoverCard>
   );
 }
 
 function EmptyState({ onNew }: { onNew: () => void }) {
+  const t = useT();
   return (
     <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border py-20 text-center">
       <div className="flex size-12 items-center justify-center rounded-xl bg-primary/15 text-primary">
         <Plug className="size-6" />
       </div>
-      <h2 className="text-xl font-display">No MCPs yet</h2>
+      <h2 className="text-xl font-display">{t("mcps.emptyTitle")}</h2>
       <p className="max-w-sm text-sm text-muted-foreground">
-        Add a remote MCP server, write your own tools in Python, or generate them
-        from an OpenAPI spec.
+        {t("mcps.emptyBody")}
       </p>
       <Button onClick={onNew} className="mt-1">
-        <Plus className="size-4" /> New MCP
+        <Plus className="size-4" /> {t("mcps.newMcp")}
       </Button>
     </div>
   );

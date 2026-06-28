@@ -2,6 +2,7 @@ import * as React from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "./button";
+import { Tooltip, TooltipTrigger, TooltipContent } from "./tooltip";
 
 export function Modal({
   open,
@@ -50,9 +51,14 @@ export function Modal({
               <p className="mt-1 text-[13px] text-muted-foreground">{description}</p>
             )}
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} className="-mr-2 -mt-1">
-            <X className="size-4" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" onClick={onClose} className="-mr-2 -mt-1">
+                <X className="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Close</TooltipContent>
+          </Tooltip>
         </div>
         {children}
         {footer && <div className="mt-5 flex justify-end gap-2">{footer}</div>}

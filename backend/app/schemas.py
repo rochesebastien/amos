@@ -9,11 +9,25 @@ from pydantic import BaseModel
 # ---- Settings ----------------------------------------------------------------
 
 
+class EnabledModelOut(BaseModel):
+    id: str
+    base_url: str = ""  # per-model override; "" = use the global gateway
+    has_api_key: bool = False  # never leak the per-model key
+
+
+class EnabledModelIn(BaseModel):
+    id: str
+    base_url: Optional[str] = None  # None = keep existing
+    api_key: Optional[str] = None  # write-only; None = keep, "" = clear
+
+
 class SettingsOut(BaseModel):
     llm_base_url: str = ""
-    llm_model: str = ""
+    llm_model: str = ""  # the default model
     has_api_key: bool = False  # never leak the key itself
     max_tool_iterations: int = 6
+    language: str = "en"
+    enabled_models: list[EnabledModelOut] = []  # models activated for use in chat
 
 
 class SettingsIn(BaseModel):
@@ -21,6 +35,8 @@ class SettingsIn(BaseModel):
     llm_model: Optional[str] = None
     llm_api_key: Optional[str] = None  # write-only; "" clears it
     max_tool_iterations: Optional[int] = None
+    language: Optional[str] = None
+    enabled_models: Optional[list[EnabledModelIn]] = None
 
 
 # ---- Projects ----------------------------------------------------------------
@@ -117,3 +133,4 @@ class ChatIn(BaseModel):
     conversation_id: Optional[int] = None
     project_id: Optional[int] = None
     message: str
+    model: Optional[str] = None  # per-message model pick (overrides project/default)
