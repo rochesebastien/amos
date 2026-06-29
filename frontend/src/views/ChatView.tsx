@@ -346,7 +346,7 @@ export function ChatView() {
       )}
 
       {/* composer */}
-      <div className="border-t border-border px-6 py-4">
+      <div className="px-6 py-4">
         <div className="mx-auto w-full max-w-3xl">
           {(activeProject || activeMcps.length > 0) && (
             <div className="mb-2 flex flex-wrap items-center gap-1.5">

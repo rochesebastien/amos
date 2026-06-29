@@ -164,13 +164,12 @@ const dict: Record<Lang, Record<string, string>> = {
     "composer.add": "Add",
     "composer.attachFiles": "Add files or photos",
     "composer.addToProject": "Add to project",
-    "composer.editProject": "Edit project…",
-    "composer.newProject": "New project…",
+    "composer.manageProjects": "Manage projects",
     "composer.mcpTools": "MCP tools",
     "composer.mcpToolsLabel": "Tools attached to this project",
     "composer.mcpPickProject": "Pick a project to attach MCP tools.",
-    "composer.noMcpsYet": "No MCPs yet — create one below.",
-    "composer.newMcp": "New MCP…",
+    "composer.noMcpsYet": "No MCPs yet.",
+    "composer.manageMcps": "Manage MCPs",
     "composer.clearProject": "Remove project",
 
     // projects
@@ -394,13 +393,12 @@ const dict: Record<Lang, Record<string, string>> = {
     "composer.add": "Ajouter",
     "composer.attachFiles": "Ajouter des fichiers ou des photos",
     "composer.addToProject": "Ajouter au projet",
-    "composer.editProject": "Modifier le projet…",
-    "composer.newProject": "Nouveau projet…",
+    "composer.manageProjects": "Gérer les projets",
     "composer.mcpTools": "Outils MCP",
     "composer.mcpToolsLabel": "Outils rattachés à ce projet",
     "composer.mcpPickProject": "Choisissez un projet pour rattacher des outils MCP.",
-    "composer.noMcpsYet": "Aucun MCP pour l’instant — créez-en un ci-dessous.",
-    "composer.newMcp": "Nouveau MCP…",
+    "composer.noMcpsYet": "Aucun MCP pour l’instant.",
+    "composer.manageMcps": "Gérer les MCPs",
     "composer.clearProject": "Retirer le projet",
 
     // projects

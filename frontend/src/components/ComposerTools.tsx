@@ -3,16 +3,16 @@ import {
   Plus,
   Paperclip,
   Folder,
-  FolderPlus,
   Pencil,
   Plug,
   Wrench,
   Check,
   X,
+  Settings,
 } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
 import { type MCP, type Project } from "@/lib/api";
 import { useMcps, useProjects, useProjectMutations } from "@/lib/queries";
-import { ProjectModal } from "@/components/ProjectModal";
 import { McpModal, MCP_TYPE_ICON } from "@/components/McpModal";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -48,15 +48,12 @@ export function ComposerAddMenu({
   onAttachFiles: () => void;
 }) {
   const t = useT();
+  const navigate = useNavigate();
   const { data: projects = [] } = useProjects();
   const { data: mcps = [] } = useMcps();
   const projectMutations = useProjectMutations();
 
   const [menuOpen, setMenuOpen] = useState(false);
-  const [projectModal, setProjectModal] = useState<{ open: boolean; editing: Project | null }>({
-    open: false,
-    editing: null,
-  });
   const [mcpModal, setMcpModal] = useState<{ open: boolean; editing: MCP | null }>({
     open: false,
     editing: null,
@@ -140,19 +137,9 @@ export function ComposerAddMenu({
                 </DropdownMenuItem>
               ))}
               <DropdownMenuSeparator />
-              {activeProject && (
-                <DropdownMenuItem
-                  onSelect={() => launch(() => setProjectModal({ open: true, editing: activeProject }))}
-                >
-                  <Pencil className="size-4 text-muted-foreground" />
-                  <span className="flex-1">{t("composer.editProject")}</span>
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem
-                onSelect={() => launch(() => setProjectModal({ open: true, editing: null }))}
-              >
-                <FolderPlus className="size-4 text-muted-foreground" />
-                <span className="flex-1">{t("composer.newProject")}</span>
+              <DropdownMenuItem onSelect={() => launch(() => navigate({ to: "/projects" }))}>
+                <Settings className="size-4 text-muted-foreground" />
+                <span className="flex-1">{t("composer.manageProjects")}</span>
               </DropdownMenuItem>
             </DropdownMenuSubContent>
           </DropdownMenuSub>
@@ -212,25 +199,15 @@ export function ComposerAddMenu({
                 })
               )}
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onSelect={() => launch(() => setMcpModal({ open: true, editing: null }))}
-              >
-                <Plus className="size-4 text-muted-foreground" />
-                <span className="flex-1">{t("composer.newMcp")}</span>
+              <DropdownMenuItem onSelect={() => launch(() => navigate({ to: "/mcps" }))}>
+                <Settings className="size-4 text-muted-foreground" />
+                <span className="flex-1">{t("composer.manageMcps")}</span>
               </DropdownMenuItem>
             </DropdownMenuSubContent>
           </DropdownMenuSub>
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <ProjectModal
-        open={projectModal.open}
-        project={projectModal.editing}
-        onClose={() => setProjectModal({ open: false, editing: null })}
-        onCreated={(p) => {
-          if (!locked) onSelectProject(p.id);
-        }}
-      />
       <McpModal
         open={mcpModal.open}
         mcp={mcpModal.editing}
