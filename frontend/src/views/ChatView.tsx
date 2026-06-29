@@ -8,16 +8,14 @@ import {
   AlertCircle,
   Copy,
   Check,
-  Paperclip,
   FileText,
   X,
-  Folder,
-  Plug,
   ChevronDown,
 } from "lucide-react";
 import { streamChat, type Message, type ChatEvent } from "@/lib/api";
 import { qk, useConversation, useProjects, useMcps, useSettings } from "@/lib/queries";
 import { Markdown } from "@/components/Markdown";
+import { ComposerAddMenu, ProjectChip, ToolsChip } from "@/components/ComposerTools";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import {
@@ -26,7 +24,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Spinner } from "@/components/ui/spinner";
 import {
@@ -301,83 +298,8 @@ export function ChatView() {
   return (
     <div className="flex min-w-0 flex-1 flex-col">
       {/* header */}
-      <header className="flex items-center justify-between gap-4 border-b border-border px-6 py-3">
+      <header className="flex items-center gap-4 border-b border-border px-6 py-3">
         <h1 className="truncate text-base font-display">{title}</h1>
-        <div className="flex items-center gap-2">
-          {/* MCP indicator — active MCPs for this chat */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="flex h-8 items-center gap-1.5 rounded-lg border border-input bg-card px-3 text-[13px] transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-              >
-                <Plug className="size-3.5 text-primary" />
-                <span>
-                  {t(activeMcps.length === 1 ? "chat.mcpCountOne" : "chat.mcpCountOther", {
-                    n: activeMcps.length,
-                  })}
-                </span>
-                <ChevronDown className="size-3.5 text-muted-foreground" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-60">
-              <DropdownMenuLabel>{t("chat.activeMcps")}</DropdownMenuLabel>
-              {activeMcps.length === 0 ? (
-                <div className="px-2 py-1.5 text-[13px] text-muted-foreground">
-                  {activeProject ? t("chat.noMcpsAttached") : t("chat.pickProjectMcps")}
-                </div>
-              ) : (
-                activeMcps.map((m) => (
-                  <DropdownMenuItem
-                    key={m.id}
-                    className="cursor-default"
-                    onSelect={(e) => e.preventDefault()}
-                  >
-                    <Plug className="size-3.5 shrink-0 text-primary" />
-                    <span className="flex-1 truncate">{m.name}</span>
-                    <span className="shrink-0 text-[11px] text-muted-foreground">
-                      {t(m.tool_count === 1 ? "chat.toolCountOne" : "chat.toolCountOther", {
-                        n: m.tool_count,
-                      })}
-                    </span>
-                  </DropdownMenuItem>
-                ))
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Project indicator / selector */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild disabled={conversationId != null}>
-              <button
-                type="button"
-                disabled={conversationId != null}
-                className="flex h-8 w-48 items-center gap-1.5 rounded-lg border border-input bg-card px-3 text-[13px] transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-              >
-                <Folder className="size-3.5 shrink-0 text-primary" />
-                <span className="flex-1 truncate text-left">
-                  {activeProject ? activeProject.name : t("threads.noProject")}
-                </span>
-                <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onSelect={() => setProjectId(null)}>
-                <Folder className="size-3.5 shrink-0 text-muted-foreground" />
-                <span className="flex-1">{t("threads.noProject")}</span>
-                {projectId == null && <Check className="size-3.5 shrink-0 text-primary" />}
-              </DropdownMenuItem>
-              {projects.length > 0 && <DropdownMenuSeparator />}
-              {projects.map((p) => (
-                <DropdownMenuItem key={p.id} onSelect={() => setProjectId(p.id)}>
-                  <Folder className="size-3.5 shrink-0 text-primary" />
-                  <span className="flex-1 truncate">{p.name}</span>
-                  {projectId === p.id && <Check className="size-3.5 shrink-0 text-primary" />}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
       </header>
 
       {/* messages */}
@@ -426,6 +348,18 @@ export function ChatView() {
       {/* composer */}
       <div className="border-t border-border px-6 py-4">
         <div className="mx-auto w-full max-w-3xl">
+          {(activeProject || activeMcps.length > 0) && (
+            <div className="mb-2 flex flex-wrap items-center gap-1.5">
+              {activeProject && (
+                <ProjectChip
+                  project={activeProject}
+                  locked={conversationId != null}
+                  onClear={() => setProjectId(null)}
+                />
+              )}
+              <ToolsChip activeMcps={activeMcps} />
+            </div>
+          )}
           {attachments.length > 0 && (
             <AttachmentGroup className="mb-2">
               {attachments.map((a) => (
@@ -467,18 +401,12 @@ export function ChatView() {
                 e.target.value = "";
               }}
             />
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => fileRef.current?.click()}
-                >
-                  <Paperclip className="size-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{t("chat.attachFiles")}</TooltipContent>
-            </Tooltip>
+            <ComposerAddMenu
+              projectId={projectId}
+              onSelectProject={setProjectId}
+              locked={conversationId != null}
+              onAttachFiles={() => fileRef.current?.click()}
+            />
 
             <textarea
               value={input}
