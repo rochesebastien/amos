@@ -12,17 +12,28 @@ gateway — from **Settings**. Nothing about the model is hardcoded.
 
 ## Features
 
-- **Chat** — streaming conversations, agentic tool-calling, conversation history.
-- **Projects** — group conversations, give each a custom system pre-prompt, and
-  attach one or more MCPs.
+- **Chat** — streaming conversations, agentic tool-calling, conversation history,
+  and a **model picker in the composer** to switch model per message.
+- **Projects** — group conversations, give each a custom system pre-prompt, an
+  optional model override, and attach one or more MCPs.
 - **MCP management (CRUD)** — create MCPs three ways and attach them to any
   number of projects:
   1. **Remote** — connect to an existing MCP server over streamable HTTP (JSON-RPC).
   2. **Code** — paste your own Python that defines tools.
   3. **OpenAPI** — drop in an `openapi.json` (e.g. from a FastAPI app) or its URL
      and an MCP tool set is **generated on the fly** from the spec.
-- **Settings** — fully configurable LLM connection (base URL, API key, model),
-  with live model discovery from the gateway's `/v1/models`, plus appearance.
+- **Settings** — a dedicated settings workspace with its own sidebar, split into
+  three sections:
+  - **General** — appearance (light / dark / system) and **interface language
+    with full English / French i18n**.
+  - **Models** — configure the gateway connection (base URL, API key, max tool
+    iterations), **discover** models from the gateway's `/v1/models`, **activate**
+    the ones you want, pick a **default model**, and optionally give any model its
+    own **per-model connection override** (its own base URL + API key) to hit a
+    provider directly without a gateway.
+  - **Storage** — **export** your whole app to a single JSON file and **import**
+    it back, with per-category filtering (settings & models, projects, MCPs,
+    chats & messages).
 
 ## Architecture
 
@@ -54,8 +65,9 @@ npm install
 npm run dev        # http://localhost:5173 (proxies /api to :8000)
 ```
 
-Then open the app, go to **Settings**, enter your LiteLLM base URL + API key,
-pick a model, and start chatting.
+Then open the app, go to **Settings → Models**, enter your LiteLLM base URL +
+API key, **Discover** and activate a model (set one as default), and start
+chatting.
 
 ## Deployment (Docker / Dokploy)
 
@@ -78,7 +90,7 @@ docker compose up --build        # → http://localhost:8000
    `/data/cheveluai.db`, set via `CHEVELUAI_DB`).
 4. Set the application **port to `8000`** and point your domain at it; Dokploy's
    Traefik handles TLS.
-5. Deploy, then open **Settings** and connect your model as above.
+5. Deploy, then open **Settings → Models** and connect your model as above.
 
 | Env var            | Default                 | Purpose                                  |
 | ------------------ | ----------------------- | ---------------------------------------- |

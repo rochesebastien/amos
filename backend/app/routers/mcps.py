@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -26,6 +27,16 @@ def _set_links(session: Session, mcp_id: int, project_ids: list[int]) -> None:
         session.add(ProjectMCPLink(project_id=pid, mcp_id=mcp_id))
 
 
+async def _tool_count(m: MCP) -> int:
+    """Best-effort count of tools exposed by an MCP; 0 if it can't be reached."""
+    if not m.enabled:
+        return 0
+    try:
+        return len(await mcp_runtime.list_mcp_tools(m))
+    except Exception:
+        return 0
+
+
 def _to_out(session: Session, m: MCP, tool_count: int = 0) -> MCPOut:
     return MCPOut(
         id=m.id,
@@ -42,13 +53,14 @@ def _to_out(session: Session, m: MCP, tool_count: int = 0) -> MCPOut:
 
 
 @router.get("", response_model=list[MCPOut])
-def list_mcps(session: Session = Depends(get_session)) -> list[MCPOut]:
+async def list_mcps(session: Session = Depends(get_session)) -> list[MCPOut]:
     mcps = session.exec(select(MCP).order_by(MCP.updated_at.desc())).all()
-    return [_to_out(session, m) for m in mcps]
+    counts = await asyncio.gather(*(_tool_count(m) for m in mcps))
+    return [_to_out(session, m, c) for m, c in zip(mcps, counts)]
 
 
 @router.post("", response_model=MCPOut)
-def create_mcp(body: MCPIn, session: Session = Depends(get_session)) -> MCPOut:
+async def create_mcp(body: MCPIn, session: Session = Depends(get_session)) -> MCPOut:
     m = MCP(
         name=body.name.strip() or "Untitled MCP",
         description=body.description,
@@ -61,19 +73,19 @@ def create_mcp(body: MCPIn, session: Session = Depends(get_session)) -> MCPOut:
     session.refresh(m)
     _set_links(session, m.id, body.project_ids)
     session.commit()
-    return _to_out(session, m)
+    return _to_out(session, m, await _tool_count(m))
 
 
 @router.get("/{mcp_id}", response_model=MCPOut)
-def get_mcp(mcp_id: int, session: Session = Depends(get_session)) -> MCPOut:
+async def get_mcp(mcp_id: int, session: Session = Depends(get_session)) -> MCPOut:
     m = session.get(MCP, mcp_id)
     if not m:
         raise HTTPException(404, "MCP not found")
-    return _to_out(session, m)
+    return _to_out(session, m, await _tool_count(m))
 
 
 @router.put("/{mcp_id}", response_model=MCPOut)
-def update_mcp(mcp_id: int, body: MCPIn, session: Session = Depends(get_session)) -> MCPOut:
+async def update_mcp(mcp_id: int, body: MCPIn, session: Session = Depends(get_session)) -> MCPOut:
     m = session.get(MCP, mcp_id)
     if not m:
         raise HTTPException(404, "MCP not found")
@@ -87,7 +99,7 @@ def update_mcp(mcp_id: int, body: MCPIn, session: Session = Depends(get_session)
     _set_links(session, m.id, body.project_ids)
     session.commit()
     session.refresh(m)
-    return _to_out(session, m)
+    return _to_out(session, m, await _tool_count(m))
 
 
 @router.delete("/{mcp_id}")

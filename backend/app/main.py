@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .db import init_db
-from .routers import chat, conversations, mcps, projects, settings
+from .routers import chat, conversations, mcps, projects, settings, storage
 
 
 @asynccontextmanager
@@ -33,6 +33,7 @@ app.include_router(projects.router)
 app.include_router(mcps.router)
 app.include_router(conversations.router)
 app.include_router(chat.router)
+app.include_router(storage.router)
 
 
 @app.get("/api/health")

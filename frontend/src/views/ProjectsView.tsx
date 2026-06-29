@@ -1,90 +1,58 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { FolderKanban, Plus, Pencil, Trash2, MessageSquarePlus, Plug } from "lucide-react";
-import { type Project, type ProjectInput } from "@/lib/api";
-import { useMcps, useProjectMutations, useProjects } from "@/lib/queries";
+import { FolderKanban, Plus, Pencil, Trash2, Plug, MessageCirclePlus } from "lucide-react";
+import { type Project } from "@/lib/api";
+import { useProjectMutations, useProjects } from "@/lib/queries";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Modal } from "@/components/ui/modal";
-import { Field } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
-
-const blank: ProjectInput = {
-  name: "",
-  description: "",
-  system_prompt: "",
-  model: "",
-  mcp_ids: [],
-};
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { useConfirm } from "@/components/ui/confirm";
+import { ProjectModal } from "@/components/ProjectModal";
+import { useT } from "@/lib/i18n";
 
 export function ProjectsView() {
+  const t = useT();
   const navigate = useNavigate();
   const { data: projects = [] } = useProjects();
-  const { data: mcps = [] } = useMcps();
   const mutations = useProjectMutations();
+  const confirm = useConfirm();
   const [editing, setEditing] = useState<Project | null>(null);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<ProjectInput>(blank);
-  const [saving, setSaving] = useState(false);
 
   const startNewChat = (projectId: number) =>
     navigate({ to: "/", search: { project: projectId } });
 
   const openNew = () => {
     setEditing(null);
-    setForm(blank);
     setOpen(true);
   };
   const openEdit = (p: Project) => {
     setEditing(p);
-    setForm({
-      name: p.name,
-      description: p.description,
-      system_prompt: p.system_prompt,
-      model: p.model,
-      mcp_ids: p.mcp_ids,
-    });
     setOpen(true);
   };
 
-  const save = async () => {
-    if (!form.name.trim()) return;
-    setSaving(true);
-    try {
-      if (editing) await mutations.update.mutateAsync({ id: editing.id, body: form });
-      else await mutations.create.mutateAsync(form);
-      setOpen(false);
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const remove = async (p: Project) => {
-    if (!confirm(`Delete project “${p.name}”?`)) return;
+    const ok = await confirm({
+      title: t("projects.deleteTitle"),
+      description: t("projects.deleteDesc", { name: p.name }),
+      confirmText: t("common.delete"),
+      destructive: true,
+    });
+    if (!ok) return;
     await mutations.remove.mutateAsync(p.id);
   };
-
-  const toggleMcp = (id: number) =>
-    setForm((f) => ({
-      ...f,
-      mcp_ids: f.mcp_ids?.includes(id)
-        ? f.mcp_ids.filter((x) => x !== id)
-        : [...(f.mcp_ids ?? []), id],
-    }));
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
       <header className="flex items-center justify-between gap-4 px-6 pt-8 pb-4">
         <div>
-          <h1 className="text-3xl font-display">Projects</h1>
+          <h1 className="text-3xl font-display">{t("nav.projects")}</h1>
           <p className="mt-1 text-sm text-muted-foreground/70">
-            Group conversations, set a pre-prompt, and attach MCP tools.
+            {t("projects.subtitle")}
           </p>
         </div>
         <Button onClick={openNew}>
-          <Plus className="size-4" /> New project
+          <Plus className="size-4" /> {t("projects.new")}
         </Button>
       </header>
 
@@ -104,12 +72,30 @@ export function ProjectsView() {
                     <h3 className="font-display text-base">{p.name}</h3>
                   </div>
                   <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                    <Button size="icon" variant="ghost" onClick={() => openEdit(p)}>
-                      <Pencil className="size-3.5" />
-                    </Button>
-                    <Button size="icon" variant="ghost" onClick={() => remove(p)}>
-                      <Trash2 className="size-3.5" />
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button size="icon" variant="ghost" onClick={() => startNewChat(p.id)}>
+                          <MessageCirclePlus className="size-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{t("projects.newChat")}</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button size="icon" variant="ghost" onClick={() => openEdit(p)}>
+                          <Pencil className="size-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{t("projects.edit")}</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button size="icon" variant="ghost" onClick={() => remove(p)}>
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{t("common.delete")}</TooltipContent>
+                    </Tooltip>
                   </div>
                 </div>
                 {p.description && (
@@ -120,131 +106,37 @@ export function ProjectsView() {
                 <div className="mt-3 flex flex-wrap items-center gap-1.5">
                   {p.mcp_ids.length > 0 ? (
                     <Badge variant="primary">
-                      <Plug className="size-3" /> {p.mcp_ids.length} MCP
-                      {p.mcp_ids.length > 1 ? "s" : ""}
+                      <Plug className="size-3" /> {t("projects.mcpCount", { count: p.mcp_ids.length })}
                     </Badge>
                   ) : (
-                    <Badge variant="outline">No MCPs</Badge>
+                    <Badge variant="outline">{t("projects.noMcps")}</Badge>
                   )}
                   {p.model && <Badge variant="secondary">{p.model}</Badge>}
                 </div>
-                <div className="mt-3 flex-1" />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-3 w-full"
-                  onClick={() => startNewChat(p.id)}
-                >
-                  <MessageSquarePlus className="size-3.5" /> New chat
-                </Button>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      <Modal
-        open={open}
-        onClose={() => setOpen(false)}
-        title={editing ? "Edit project" : "New project"}
-        className="max-w-xl"
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={save} disabled={saving || !form.name.trim()}>
-              {saving ? "Saving…" : "Save"}
-            </Button>
-          </>
-        }
-      >
-        <div className="flex flex-col gap-4">
-          <Field label="Name">
-            <Input
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="My project"
-              autoFocus
-            />
-          </Field>
-          <Field label="Description">
-            <Input
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              placeholder="Optional"
-            />
-          </Field>
-          <Field label="Pre-prompt (system prompt)" hint="Sent as the system message for every chat in this project.">
-            <Textarea
-              value={form.system_prompt}
-              onChange={(e) => setForm({ ...form, system_prompt: e.target.value })}
-              placeholder="You are a helpful assistant specialised in…"
-              rows={4}
-            />
-          </Field>
-          <Field label="Model override" hint="Leave empty to use the default model from Settings.">
-            <Input
-              value={form.model}
-              onChange={(e) => setForm({ ...form, model: e.target.value })}
-              placeholder="(default)"
-            />
-          </Field>
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[13px] text-muted-foreground">Attached MCPs</span>
-            {mcps.length === 0 ? (
-              <p className="text-[13px] text-muted-foreground/70">
-                No MCPs yet — create some in the MCPs tab.
-              </p>
-            ) : (
-              <div className="flex flex-col gap-1 rounded-md border border-border p-1">
-                {mcps.map((m) => {
-                  const checked = form.mcp_ids?.includes(m.id);
-                  return (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => toggleMcp(m.id)}
-                      className={cn(
-                        "flex items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-colors",
-                        checked ? "bg-primary/10" : "hover:bg-accent",
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "flex size-4 items-center justify-center rounded border",
-                          checked ? "border-primary bg-primary text-primary-foreground" : "border-input",
-                        )}
-                      >
-                        {checked && "✓"}
-                      </span>
-                      <Plug className="size-3.5 text-primary" />
-                      <span className="flex-1">{m.name}</span>
-                      <Badge variant="outline">{m.type}</Badge>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      </Modal>
+      <ProjectModal open={open} onClose={() => setOpen(false)} project={editing} />
     </div>
   );
 }
 
 function EmptyState({ onNew }: { onNew: () => void }) {
+  const t = useT();
   return (
     <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border py-20 text-center">
       <div className="flex size-12 items-center justify-center rounded-xl bg-primary/15 text-primary">
         <FolderKanban className="size-6" />
       </div>
-      <h2 className="text-xl font-display">No projects yet</h2>
+      <h2 className="text-xl font-display">{t("projects.emptyTitle")}</h2>
       <p className="max-w-sm text-sm text-muted-foreground">
-        Create a project to give your chats a custom pre-prompt and a set of MCP tools.
+        {t("projects.emptyDesc")}
       </p>
       <Button onClick={onNew} className="mt-1">
-        <Plus className="size-4" /> New project
+        <Plus className="size-4" /> {t("projects.new")}
       </Button>
     </div>
   );

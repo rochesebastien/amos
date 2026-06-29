@@ -5,19 +5,26 @@ import {
   ArrowUp,
   Square,
   Wrench,
-  Sparkles,
   AlertCircle,
   Copy,
   Check,
-  Paperclip,
   FileText,
   X,
+  ChevronDown,
 } from "lucide-react";
 import { streamChat, type Message, type ChatEvent } from "@/lib/api";
-import { qk, useConversation, useProjects } from "@/lib/queries";
+import { qk, useConversation, useProjects, useMcps, useSettings } from "@/lib/queries";
 import { Markdown } from "@/components/Markdown";
+import { ComposerAddMenu, ProjectChip, ToolsChip } from "@/components/ComposerTools";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 import { Spinner } from "@/components/ui/spinner";
 import {
   Message as MessageRow,
@@ -47,6 +54,9 @@ import {
   AttachmentTitle,
 } from "@/components/ui/attachment";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
+import logoIcon from "@/assets/logo.png";
+import logoWaitingPrompt from "@/assets/logo_waiting_prompt.png";
 
 type ToolActivity = { id: string; name: string; args: any; result?: any };
 type UIMsg = {
@@ -96,6 +106,7 @@ function historyToUI(messages: Message[]): UIMsg[] {
 }
 
 export function ChatView() {
+  const t = useT();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const params = useParams({ strict: false }) as { conversationId?: string };
@@ -103,9 +114,12 @@ export function ChatView() {
   const conversationId = params.conversationId ? Number(params.conversationId) : null;
 
   const { data: projects = [] } = useProjects();
+  const { data: mcps = [] } = useMcps();
+  const { data: settings } = useSettings();
   const { data: conversation } = useConversation(conversationId);
 
   const [projectId, setProjectId] = useState<number | null>(search.project ?? null);
+  const [selectedModel, setSelectedModel] = useState<string>("");
   const [messages, setMessages] = useState<UIMsg[]>([]);
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<StagedFile[]>([]);
@@ -113,7 +127,7 @@ export function ChatView() {
   const abortRef = useRef<AbortController | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const title = conversation?.title ?? "New chat";
+  const title = conversation?.title ?? t("chat.newChat");
 
   // reset when navigating to a brand-new chat
   useEffect(() => {
@@ -230,7 +244,12 @@ export function ChatView() {
 
     try {
       await streamChat(
-        { conversation_id: convId, project_id: projectId, message: composed },
+        {
+          conversation_id: convId,
+          project_id: projectId,
+          message: composed,
+          model: effectiveModel || undefined,
+        },
         onEvent,
         ac.signal,
       );
@@ -258,29 +277,29 @@ export function ChatView() {
   };
 
   const activeProject = projects.find((p) => p.id === projectId);
+  const activeMcps = activeProject
+    ? mcps.filter((m) => m.enabled && activeProject.mcp_ids.includes(m.id))
+    : [];
+
+  // model selection for the composer: explicit pick > project override > default
+  const defaultModel = settings?.llm_model ?? "";
+  const effectiveModel = selectedModel || activeProject?.model || defaultModel;
+  const modelOptions = Array.from(
+    new Set(
+      [
+        ...(settings?.enabled_models ?? []).map((m) => m.id),
+        defaultModel,
+        activeProject?.model ?? "",
+      ].filter(Boolean),
+    ),
+  );
   const empty = messages.length === 0;
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
       {/* header */}
-      <header className="flex items-center justify-between gap-4 border-b border-border px-6 py-3">
+      <header className="flex items-center gap-4 border-b border-border px-6 py-3">
         <h1 className="truncate text-base font-display">{title}</h1>
-        <div className="flex items-center gap-2">
-          <span className="text-[13px] text-muted-foreground">Project</span>
-          <Select
-            value={projectId ?? ""}
-            disabled={conversationId != null}
-            onChange={(e) => setProjectId(e.target.value ? Number(e.target.value) : null)}
-            className="h-8 w-44 text-[13px]"
-          >
-            <option value="">No project</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </Select>
-        </div>
       </header>
 
       {/* messages */}
@@ -288,14 +307,12 @@ export function ChatView() {
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-3xl px-6 py-6">
             <div className="flex flex-col items-center justify-center gap-3 pt-[14vh] text-center">
-              <div className="flex size-12 items-center justify-center rounded-xl bg-primary/15 text-primary">
-                <Sparkles className="size-6" />
-              </div>
-              <h2 className="text-2xl font-display">What can I help with?</h2>
+              <img src={logoWaitingPrompt} alt="CheveluAI" className="size-16 object-contain" />
+              <h2 className="text-2xl font-display">{t("chat.emptyTitle")}</h2>
               <p className="max-w-md text-sm text-muted-foreground">
                 {activeProject
-                  ? `Chatting in “${activeProject.name}”. Its pre-prompt and attached MCP tools are active.`
-                  : "Pick a project to use its pre-prompt and MCP tools, or just start typing."}
+                  ? t("chat.emptyProjectActive", { name: activeProject.name })
+                  : t("chat.emptyNoProject")}
               </p>
             </div>
           </div>
@@ -329,8 +346,20 @@ export function ChatView() {
       )}
 
       {/* composer */}
-      <div className="border-t border-border px-6 py-4">
+      <div className="px-6 py-4">
         <div className="mx-auto w-full max-w-3xl">
+          {(activeProject || activeMcps.length > 0) && (
+            <div className="mb-2 flex flex-wrap items-center gap-1.5">
+              {activeProject && (
+                <ProjectChip
+                  project={activeProject}
+                  locked={conversationId != null}
+                  onClear={() => setProjectId(null)}
+                />
+              )}
+              <ToolsChip activeMcps={activeMcps} />
+            </div>
+          )}
           {attachments.length > 0 && (
             <AttachmentGroup className="mb-2">
               {attachments.map((a) => (
@@ -342,13 +371,15 @@ export function ChatView() {
                     <AttachmentTitle>{a.file.name}</AttachmentTitle>
                     <AttachmentDescription>
                       {a.state === "error"
-                        ? "Could not read file"
-                        : `${formatBytes(a.file.size)}${a.text != null ? " · inlined" : ""}`}
+                        ? t("chat.fileReadError")
+                        : `${formatBytes(a.file.size)}${
+                            a.text != null ? ` · ${t("chat.inlined")}` : ""
+                          }`}
                     </AttachmentDescription>
                   </AttachmentContent>
                   <AttachmentActions>
                     <AttachmentAction
-                      aria-label={`Remove ${a.file.name}`}
+                      aria-label={t("chat.removeFile", { name: a.file.name })}
                       onClick={() => removeAttachment(a.id)}
                     >
                       <X />
@@ -370,39 +401,86 @@ export function ChatView() {
                 e.target.value = "";
               }}
             />
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => fileRef.current?.click()}
-              title="Attach files"
-            >
-              <Paperclip className="size-4" />
-            </Button>
+            <ComposerAddMenu
+              projectId={projectId}
+              onSelectProject={setProjectId}
+              locked={conversationId != null}
+              onAttachFiles={() => fileRef.current?.click()}
+            />
+
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onKeyDown}
               rows={1}
-              placeholder="Send a message…"
+              placeholder={t("chat.sendPlaceholder")}
               className="max-h-48 min-h-[36px] flex-1 resize-none bg-transparent px-1 py-1.5 text-sm outline-none placeholder:text-muted-foreground"
             />
+
+            {/* model selector — text dropdown, to the left of the send button */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex h-9 max-w-[180px] items-center gap-1 rounded-lg px-2 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  <span className="truncate">{effectiveModel || t("chat.model")}</span>
+                  <ChevronDown className="size-3.5 shrink-0" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel>{t("chat.model")}</DropdownMenuLabel>
+                {modelOptions.length === 0 ? (
+                  <div className="px-2 py-1.5 text-[13px] text-muted-foreground">
+                    {t("chat.noModelHint")}
+                  </div>
+                ) : (
+                  modelOptions.map((id) => (
+                    <DropdownMenuItem key={id} onSelect={() => setSelectedModel(id)}>
+                      <Check
+                        className={cn(
+                          "size-3.5 shrink-0 text-primary",
+                          effectiveModel === id ? "opacity-100" : "opacity-0",
+                        )}
+                      />
+                      <span className="flex-1 truncate">{id}</span>
+                      {id === defaultModel && (
+                        <span className="shrink-0 text-[11px] text-muted-foreground">
+                          {t("settings.default")}
+                        </span>
+                      )}
+                    </DropdownMenuItem>
+                  ))
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             {streaming ? (
-              <Button size="icon" variant="secondary" onClick={stop} title="Stop">
-                <Square className="size-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button size="icon" variant="secondary" onClick={stop}>
+                    <Square className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{t("chat.stop")}</TooltipContent>
+              </Tooltip>
             ) : (
-              <Button
-                size="icon"
-                onClick={send}
-                disabled={!input.trim() && attachments.length === 0}
-                title="Send"
-              >
-                <ArrowUp className="size-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    onClick={send}
+                    disabled={!input.trim() && attachments.length === 0}
+                  >
+                    <ArrowUp className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{t("chat.send")}</TooltipContent>
+              </Tooltip>
             )}
           </div>
           <p className="mt-2 text-center text-[11px] text-muted-foreground/60">
-            CheveluAI runs on your configured model. Verify important information.
+            {t("chat.disclaimer")}
           </p>
         </div>
       </div>
@@ -411,6 +489,7 @@ export function ChatView() {
 }
 
 function ChatMessage({ msg, streaming }: { msg: UIMsg; streaming: boolean }) {
+  const t = useT();
   if (msg.role === "user") {
     return (
       <MessageRow align="end">
@@ -428,9 +507,7 @@ function ChatMessage({ msg, streaming }: { msg: UIMsg; streaming: boolean }) {
   return (
     <MessageRow align="start">
       <MessageAvatar>
-        <div className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground font-display text-xs">
-          C
-        </div>
+        <img src={logoIcon} alt="CheveluAI" className="size-7 object-contain" />
       </MessageAvatar>
       <MessageContent>
         <MessageHeader>CheveluAI</MessageHeader>
@@ -442,7 +519,7 @@ function ChatMessage({ msg, streaming }: { msg: UIMsg; streaming: boolean }) {
             <MarkerIcon>
               <Spinner />
             </MarkerIcon>
-            <MarkerContent className="shimmer">Thinking…</MarkerContent>
+            <MarkerContent className="shimmer">{t("chat.thinking")}</MarkerContent>
           </Marker>
         )}
 
@@ -472,24 +549,31 @@ function ChatMessage({ msg, streaming }: { msg: UIMsg; streaming: boolean }) {
 }
 
 function CopyButton({ text }: { text: string }) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
   return (
-    <Button
-      size="icon-xs"
-      variant="ghost"
-      aria-label="Copy message"
-      onClick={() => {
-        navigator.clipboard?.writeText(text);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
-      }}
-    >
-      {copied ? <Check className="size-3.5 text-primary" /> : <Copy className="size-3.5" />}
-    </Button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          size="icon-xs"
+          variant="ghost"
+          aria-label={t("chat.copyMessage")}
+          onClick={() => {
+            navigator.clipboard?.writeText(text);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          }}
+        >
+          {copied ? <Check className="size-3.5 text-primary" /> : <Copy className="size-3.5" />}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{copied ? t("chat.copied") : t("chat.copy")}</TooltipContent>
+    </Tooltip>
   );
 }
 
 function ToolMarker({ tool }: { tool: ToolActivity }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const running = tool.result === undefined;
   const resultStr =
@@ -508,7 +592,7 @@ function ToolMarker({ tool }: { tool: ToolActivity }) {
             {tool.name}
           </MarkerContent>
           <span className="ml-auto text-[12px] text-muted-foreground">
-            {running ? "running…" : open ? "hide" : "details"}
+            {running ? t("chat.running") : open ? t("chat.hide") : t("chat.details")}
           </span>
         </button>
       </Marker>

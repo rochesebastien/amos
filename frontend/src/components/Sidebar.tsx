@@ -2,7 +2,6 @@ import { useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  MessageSquarePlus,
   MessagesSquare,
   FolderKanban,
   Plug,
@@ -20,17 +19,25 @@ import {
   PanelLeftOpen,
   ArrowDownUp,
   Check,
+  Pencil,
 } from "lucide-react";
-import { api, type Conversation } from "@/lib/api";
+import { api, type Conversation, type Project } from "@/lib/api";
 import { useApp } from "@/lib/store";
+import { useT } from "@/lib/i18n";
 import { qk, useConversations, useProjects } from "@/lib/queries";
 import { useSidebar, type ProjectSort, SIDEBAR_RAIL } from "@/lib/sidebar";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { useConfirm } from "@/components/ui/confirm";
+import { ProjectModal } from "@/components/ProjectModal";
 import { cn } from "@/lib/utils";
+import logoIcon from "@/assets/logo.png";
+import logoTitleBlack from "@/assets/logo_title_black.png";
+import logoTitleLight from "@/assets/logo_title_light.png";
 
-const NAV: { to: string; label: string; icon: React.ElementType }[] = [
-  { to: "/", label: "Chat", icon: MessagesSquare },
-  { to: "/projects", label: "Projects", icon: FolderKanban },
-  { to: "/mcps", label: "MCPs", icon: Plug },
+const NAV: { to: string; labelKey: string; icon: React.ElementType }[] = [
+  { to: "/", labelKey: "nav.chat", icon: MessagesSquare },
+  { to: "/projects", labelKey: "nav.projects", icon: FolderKanban },
+  { to: "/mcps", labelKey: "nav.mcps", icon: Plug },
 ];
 
 const NO_PROJECT = -1;
@@ -50,6 +57,7 @@ function relativeTime(iso: string): string {
 }
 
 export function Sidebar() {
+  const t = useT();
   const { theme, setTheme } = useApp();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -65,7 +73,9 @@ export function Sidebar() {
 
   const { data: conversations = [] } = useConversations();
   const { data: projects = [] } = useProjects();
+  const confirm = useConfirm();
   const [sortOpen, setSortOpen] = useState(false);
+  const [editProject, setEditProject] = useState<Project | null>(null);
 
   // inline editing
   const [editConvId, setEditConvId] = useState<number | null>(null);
@@ -114,6 +124,14 @@ export function Sidebar() {
   const removeConversation = async (e: React.MouseEvent, id: number) => {
     e.stopPropagation();
     e.preventDefault();
+    const conv = conversations.find((c) => c.id === id);
+    const ok = await confirm({
+      title: t("confirm.deleteConv.title"),
+      description: t("confirm.deleteConv.desc", { title: conv?.title ?? "" }),
+      confirmText: t("common.delete"),
+      destructive: true,
+    });
+    if (!ok) return;
     await api.deleteConversation(id);
     if (activeConversationId === id) startNewChat();
     refreshConversations();
@@ -133,6 +151,12 @@ export function Sidebar() {
     setEditConvId(null);
     const current = conversations.find((c) => c.id === id);
     if (value && current && value !== current.title) {
+      const ok = await confirm({
+        title: t("confirm.renameConv.title"),
+        description: t("confirm.renameConv.desc", { from: current.title, to: value }),
+        confirmText: t("common.rename"),
+      });
+      if (!ok) return;
       await api.renameConversation(id, value);
       refreshConversations();
     }
@@ -151,6 +175,12 @@ export function Sidebar() {
     setEditProjId(null);
     const p = projects.find((x) => x.id === id);
     if (value && p && value !== p.name) {
+      const ok = await confirm({
+        title: t("confirm.renameProj.title"),
+        description: t("confirm.renameProj.desc", { from: p.name, to: value }),
+        confirmText: t("common.rename"),
+      });
+      if (!ok) return;
       await api.updateProject(id, {
         name: value,
         description: p.description,
@@ -171,6 +201,16 @@ export function Sidebar() {
     const conv = conversations.find((c) => c.id === convId);
     const target = groupId === NO_PROJECT ? null : groupId;
     if (!conv || conv.project_id === target) return;
+    const targetName =
+      target == null
+        ? t("threads.noProject")
+        : (projects.find((p) => p.id === target)?.name ?? t("threads.noProject"));
+    const ok = await confirm({
+      title: t("confirm.moveConv.title"),
+      description: t("confirm.moveConv.desc", { title: conv.title, target: targetName }),
+      confirmText: t("common.move"),
+    });
+    if (!ok) return;
     // optimistic
     qc.setQueryData<Conversation[]>(qk.conversations, (cs) =>
       (cs ?? []).map((c) => (c.id === convId ? { ...c, project_id: target } : c)),
@@ -198,7 +238,7 @@ export function Sidebar() {
       convs: byProject.get(p.id) ?? [],
     }));
     if (byProject.has(NO_PROJECT)) {
-      out.push({ id: NO_PROJECT, name: "Sans projet", convs: byProject.get(NO_PROJECT)! });
+      out.push({ id: NO_PROJECT, name: "", convs: byProject.get(NO_PROJECT)! });
     }
     return out;
   }, [conversations, projects, sort]);
@@ -212,56 +252,65 @@ export function Sidebar() {
         style={{ width: SIDEBAR_RAIL }}
         className="flex h-full shrink-0 flex-col items-center gap-1 border-r border-sidebar-border bg-sidebar py-4 text-sidebar-foreground"
       >
-        <button
-          onClick={() => toggle()}
-          title="Expand sidebar"
-          className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
-        >
-          <PanelLeftOpen className="size-4" />
-        </button>
-        <button
-          onClick={() => startNewChat()}
-          title="New chat"
-          className="flex size-9 items-center justify-center rounded-lg transition-colors hover:bg-sidebar-accent/60"
-        >
-          <MessageSquarePlus className="size-4 text-primary" />
-        </button>
+        <img src={logoIcon} alt="CheveluAI" className="mb-1 size-8" />
         <div className="my-1 h-px w-6 bg-sidebar-border" />
-        {NAV.map(({ to, label, icon: Icon }) => (
-          <Link
-            key={to}
-            to={to}
-            title={label}
-            className={cn(
-              "flex size-9 items-center justify-center rounded-lg transition-colors",
-              isNavActive(to)
-                ? "bg-sidebar-accent text-primary"
-                : "text-muted-foreground hover:bg-sidebar-accent/60",
-            )}
-          >
-            <Icon className="size-4" />
-          </Link>
+        {NAV.map(({ to, labelKey, icon: Icon }) => (
+          <Tooltip key={to}>
+            <TooltipTrigger asChild>
+              <Link
+                to={to}
+                className={cn(
+                  "flex size-9 items-center justify-center rounded-lg transition-colors",
+                  isNavActive(to)
+                    ? "bg-sidebar-accent text-primary"
+                    : "text-muted-foreground hover:bg-sidebar-accent/60",
+                )}
+              >
+                <Icon className="size-4" />
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent side="right">{t(labelKey)}</TooltipContent>
+          </Tooltip>
         ))}
         <div className="flex-1" />
-        <Link
-          to="/settings"
-          title="Settings"
-          className={cn(
-            "flex size-9 items-center justify-center rounded-lg transition-colors",
-            pathname === "/settings"
-              ? "bg-sidebar-accent text-primary"
-              : "text-muted-foreground hover:bg-sidebar-accent/60",
-          )}
-        >
-          <SettingsIcon className="size-4" />
-        </Link>
-        <button
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          title="Toggle theme"
-          className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
-        >
-          {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Link
+              to="/settings"
+              className={cn(
+                "flex size-9 items-center justify-center rounded-lg transition-colors",
+                pathname === "/settings"
+                  ? "bg-sidebar-accent text-primary"
+                  : "text-muted-foreground hover:bg-sidebar-accent/60",
+              )}
+            >
+              <SettingsIcon className="size-4" />
+            </Link>
+          </TooltipTrigger>
+          <TooltipContent side="right">{t("nav.settings")}</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
+            >
+              {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right">{t("nav.toggleTheme")}</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => toggle()}
+              className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
+            >
+              <PanelLeftOpen className="size-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right">{t("nav.expandSidebar")}</TooltipContent>
+        </Tooltip>
       </aside>
     );
   }
@@ -272,35 +321,15 @@ export function Sidebar() {
       style={{ width }}
       className="relative flex h-full shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
     >
-      {/* brand + collapse */}
-      <div className="flex items-center gap-2 px-4 pt-5 pb-3">
-        <div className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground font-display text-sm">
-          C
-        </div>
-        <span className="min-w-0 flex-1 truncate font-display text-lg">CheveluAI</span>
-        <button
-          onClick={() => toggle()}
-          title="Collapse sidebar"
-          className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
-        >
-          <PanelLeftClose className="size-4" />
-        </button>
-      </div>
-
-      {/* new chat */}
-      <div className="px-3 pb-2">
-        <button
-          onClick={() => startNewChat()}
-          className="flex w-full items-center gap-2 rounded-lg border border-sidebar-border bg-card px-3 py-2 text-sm font-semibold transition-colors hover:bg-sidebar-accent"
-        >
-          <MessageSquarePlus className="size-4 text-primary" />
-          New chat
-        </button>
+      {/* brand */}
+      <div className="px-3 pt-4 pb-3">
+        <img src={logoTitleBlack} alt="CheveluAI" className="h-12 w-full object-contain px-4 dark:hidden" />
+        <img src={logoTitleLight} alt="CheveluAI" className="hidden h-12 w-full object-contain px-4 dark:block" />
       </div>
 
       {/* nav */}
       <nav className="flex flex-col gap-0.5 px-3 py-1.5">
-        {NAV.map(({ to, label, icon: Icon }) => {
+        {NAV.map(({ to, labelKey, icon: Icon }) => {
           const active = isNavActive(to);
           return (
             <Link
@@ -314,7 +343,7 @@ export function Sidebar() {
               )}
             >
               <Icon className={cn("size-4", active && "text-primary")} />
-              {label}
+              {t(labelKey)}
             </Link>
           );
         })}
@@ -324,24 +353,28 @@ export function Sidebar() {
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pt-2 pb-2">
         <div className="flex items-center justify-between px-2 pb-1">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
-            Threads
+            {t("threads.title")}
           </span>
           <div className="relative">
-            <button
-              onClick={() => setSortOpen((o) => !o)}
-              title="Sort projects"
-              className="flex size-5 items-center justify-center rounded text-muted-foreground/60 transition-colors hover:bg-sidebar-accent/60 hover:text-foreground"
-            >
-              <ArrowDownUp className="size-3.5" />
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setSortOpen((o) => !o)}
+                  className="flex size-5 items-center justify-center rounded text-muted-foreground/60 transition-colors hover:bg-sidebar-accent/60 hover:text-foreground"
+                >
+                  <ArrowDownUp className="size-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>{t("threads.sortProjects")}</TooltipContent>
+            </Tooltip>
             {sortOpen && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setSortOpen(false)} />
                 <div className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-lg border border-border bg-popover py-1 shadow-sm">
                   {(
                     [
-                      { key: "recent", label: "Most recent" },
-                      { key: "name", label: "Name (A–Z)" },
+                      { key: "recent", label: t("threads.mostRecent") },
+                      { key: "name", label: t("threads.nameAsc") },
                     ] as { key: ProjectSort; label: string }[]
                   ).map((opt) => (
                     <button
@@ -363,7 +396,7 @@ export function Sidebar() {
         </div>
 
         {!hasAnything && projects.length === 0 && (
-          <p className="px-2 py-2 text-[13px] text-muted-foreground/70">No conversations yet.</p>
+          <p className="px-2 py-2 text-[13px] text-muted-foreground/70">{t("threads.none")}</p>
         )}
 
         <div className="flex flex-col gap-0.5">
@@ -420,19 +453,39 @@ export function Sidebar() {
                       onClick={() => toggleFold(g.id)}
                       onDoubleClick={(e) => !isOrphan && startProjRename(e, g.id, g.name)}
                       className="min-w-0 flex-1 truncate text-left font-medium"
-                      title={isOrphan ? undefined : "Double-click to rename"}
+                      title={isOrphan ? undefined : t("threads.doubleClickRename")}
                     >
-                      {g.name}
+                      {isOrphan ? t("threads.noProject") : g.name}
                     </button>
                   )}
                   {!isOrphan && (
-                    <button
-                      title={`New chat in ${g.name}`}
-                      onClick={() => startNewChat(g.id)}
-                      className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:text-foreground group-hover/folder:opacity-100"
-                    >
-                      <Plus className="size-3.5" />
-                    </button>
+                    <>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => {
+                              const p = projects.find((x) => x.id === g.id);
+                              if (p) setEditProject(p);
+                            }}
+                            className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:text-foreground group-hover/folder:opacity-100"
+                          >
+                            <Pencil className="size-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">{t("threads.edit", { name: g.name })}</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => startNewChat(g.id)}
+                            className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:text-foreground group-hover/folder:opacity-100"
+                          >
+                            <Plus className="size-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">{t("threads.newChatIn", { name: g.name })}</TooltipContent>
+                      </Tooltip>
+                    </>
                   )}
                 </div>
 
@@ -440,7 +493,7 @@ export function Sidebar() {
                   <div className="flex flex-col gap-0.5 pb-1">
                     {g.convs.length === 0 ? (
                       <p className="py-1 pl-7 text-[12px] text-muted-foreground/50">
-                        {isDropTarget ? "Drop here" : "No conversations"}
+                        {isDropTarget ? t("threads.dropHere") : t("threads.noConversations")}
                       </p>
                     ) : (
                       g.convs.map((c) => {
@@ -519,15 +572,30 @@ export function Sidebar() {
           )}
         >
           <SettingsIcon className={cn("size-4", pathname === "/settings" && "text-primary")} />
-          Settings
+          {t("nav.settings")}
         </Link>
-        <button
-          title="Toggle theme"
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
-        >
-          {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
+            >
+              {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Toggle theme</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => toggle()}
+              className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
+            >
+              <PanelLeftClose className="size-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>{t("nav.collapseSidebar")}</TooltipContent>
+        </Tooltip>
       </div>
 
       {/* drag handle */}
@@ -536,6 +604,12 @@ export function Sidebar() {
         onDoubleClick={() => toggle()}
         title="Drag to resize · double-click to collapse"
         className="absolute right-0 top-0 z-10 h-full w-1 cursor-col-resize transition-colors hover:bg-primary/40"
+      />
+
+      <ProjectModal
+        open={editProject !== null}
+        onClose={() => setEditProject(null)}
+        project={editProject}
       />
     </aside>
   );

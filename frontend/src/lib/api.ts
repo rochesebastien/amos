@@ -1,10 +1,24 @@
 // Typed client for the CheveluAI backend.
 
+export type EnabledModel = {
+  id: string;
+  base_url: string; // per-model override; "" = use the global gateway
+  has_api_key: boolean; // whether a per-model key is stored
+};
+
+export type EnabledModelUpdate = {
+  id: string;
+  base_url?: string;
+  api_key?: string; // omit to keep, "" to clear
+};
+
 export type Settings = {
   llm_base_url: string;
   llm_model: string;
   has_api_key: boolean;
   max_tool_iterations: number;
+  language: string;
+  enabled_models: EnabledModel[];
 };
 
 export type SettingsUpdate = {
@@ -12,7 +26,13 @@ export type SettingsUpdate = {
   llm_model?: string;
   llm_api_key?: string;
   max_tool_iterations?: number;
+  language?: string;
+  enabled_models?: EnabledModelUpdate[];
 };
+
+export type StorageCategory = "settings" | "projects" | "mcps" | "conversations";
+
+export type ImportResult = { ok: boolean; imported: Record<string, number> };
 
 export type Project = {
   id: number;
@@ -113,6 +133,15 @@ export const api = {
     req<Settings>("/api/settings", { method: "PUT", body: JSON.stringify(body) }),
   discoverModels: () => req<{ models: string[] }>("/api/settings/models"),
 
+  // storage (export / import)
+  exportData: (categories: StorageCategory[]) =>
+    req<Record<string, any>>(`/api/storage/export?categories=${categories.join(",")}`),
+  importData: (data: Record<string, any>, categories: StorageCategory[]) =>
+    req<ImportResult>("/api/storage/import", {
+      method: "POST",
+      body: JSON.stringify({ data, categories }),
+    }),
+
   // projects
   listProjects: () => req<Project[]>("/api/projects"),
   createProject: (body: ProjectInput) =>
@@ -163,7 +192,12 @@ export type ChatEvent =
   | { type: "done" };
 
 export async function streamChat(
-  body: { conversation_id?: number | null; project_id?: number | null; message: string },
+  body: {
+    conversation_id?: number | null;
+    project_id?: number | null;
+    message: string;
+    model?: string | null;
+  },
   onEvent: (ev: ChatEvent) => void,
   signal?: AbortSignal,
 ): Promise<void> {

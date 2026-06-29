@@ -10,19 +10,18 @@ const variants: Record<Variant, string> = {
   primary: "bg-primary/15 text-foreground border border-primary/30",
 };
 
-export function Badge({
-  className,
-  variant = "secondary",
-  ...props
-}: React.HTMLAttributes<HTMLSpanElement> & { variant?: Variant }) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold",
-        variants[variant],
-        className,
-      )}
-      {...props}
-    />
-  );
-}
+export const Badge = React.forwardRef<
+  HTMLSpanElement,
+  React.HTMLAttributes<HTMLSpanElement> & { variant?: Variant }
+>(({ className, variant = "secondary", ...props }, ref) => (
+  <span
+    ref={ref}
+    className={cn(
+      "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold",
+      variants[variant],
+      className,
+    )}
+    {...props}
+  />
+));
+Badge.displayName = "Badge";
