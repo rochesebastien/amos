@@ -19,7 +19,9 @@ gateway — from **Settings**. Nothing about the model is hardcoded.
 - **MCP management (CRUD)** — create MCPs three ways and attach them to any
   number of projects:
   1. **Remote** — connect to an existing MCP server over streamable HTTP (JSON-RPC).
-  2. **Code** — paste your own Python that defines tools.
+  2. **Code** — build a small Python project in an integrated, VSCode-style
+     editor (file tree + import-your-project), with one entry file that defines
+     the tools.
   3. **OpenAPI** — drop in an `openapi.json` (e.g. from a FastAPI app) or its URL
      and an MCP tool set is **generated on the fly** from the spec.
 - **Settings** — a dedicated settings workspace with its own sidebar, split into
