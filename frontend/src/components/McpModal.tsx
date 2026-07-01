@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   Globe,
   Code2,
+  FileCode2,
   FileJson,
   FlaskConical,
   CheckCircle2,
@@ -23,6 +24,7 @@ import { Field, Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useConfirm } from "@/components/ui/confirm";
+import { CodeEditor, type CodeFiles } from "@/components/CodeEditor";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Trash2 } from "lucide-react";
@@ -32,6 +34,25 @@ export const MCP_TYPE_ICON: Record<MCPType, React.ElementType> = {
   remote: Globe,
   code: Code2,
 };
+
+const DEFAULT_CODE = `TOOLS = [
+    {
+        "name": "add",
+        "description": "Add two numbers",
+        "parameters": {
+            "type": "object",
+            "properties": {"a": {"type": "number"}, "b": {"type": "number"}},
+            "required": ["a", "b"],
+        },
+    },
+]
+
+
+def call(name, arguments):
+    if name == "add":
+        return arguments["a"] + arguments["b"]
+    raise ValueError(f"unknown tool {name}")
+`;
 
 type FormState = {
   name: string;
@@ -50,8 +71,9 @@ type FormState = {
   path: string;
   // shared
   headersText: string;
-  // code
-  code: string;
+  // code — a small Python project (file tree) with one entry file
+  files: CodeFiles;
+  entry: string;
 };
 
 const blank: FormState = {
@@ -68,24 +90,8 @@ const blank: FormState = {
   port: "",
   path: "/mcp",
   headersText: "",
-  code: `TOOLS = [
-    {
-        "name": "add",
-        "description": "Add two numbers",
-        "parameters": {
-            "type": "object",
-            "properties": {"a": {"type": "number"}, "b": {"type": "number"}},
-            "required": ["a", "b"],
-        },
-    },
-]
-
-
-def call(name, arguments):
-    if name == "add":
-        return arguments["a"] + arguments["b"]
-    raise ValueError(f"unknown tool {name}")
-`,
+  files: { "main.py": DEFAULT_CODE },
+  entry: "main.py",
 };
 
 function parseHeaders(text: string): Record<string, string> | undefined {
@@ -146,7 +152,10 @@ function buildConfig(f: FormState): Record<string, any> {
     if (headers) cfg.headers = headers;
     return cfg;
   }
-  return { code: f.code };
+  // code: a file tree + the entry file that defines TOOLS / call
+  const files = Object.keys(f.files).length ? f.files : { "main.py": "" };
+  const entry = f.entry && files[f.entry] ? f.entry : (files["main.py"] ? "main.py" : Object.keys(files)[0]);
+  return { files, entry };
 }
 
 function parseRemoteParts(c: Record<string, any>): {
@@ -181,9 +190,23 @@ function parseRemoteParts(c: Record<string, any>): {
   return { scheme: "http", host: "", port: "", path: "/mcp" };
 }
 
+function codeFromConfig(c: Record<string, any>): { files: CodeFiles; entry: string } {
+  // new shape: a files map (+ entry); legacy shape: a single `code` string
+  if (c.files && typeof c.files === "object" && Object.keys(c.files).length) {
+    const files = c.files as CodeFiles;
+    const entry = c.entry && files[c.entry] ? c.entry : (files["main.py"] ? "main.py" : Object.keys(files)[0]);
+    return { files, entry };
+  }
+  if (typeof c.code === "string") {
+    return { files: { "main.py": c.code }, entry: "main.py" };
+  }
+  return { files: { "main.py": DEFAULT_CODE }, entry: "main.py" };
+}
+
 function mcpToForm(m: MCP): FormState {
   const c = m.config || {};
   const remote = parseRemoteParts(c);
+  const code = codeFromConfig(c);
   return {
     ...blank,
     name: m.name,
@@ -199,7 +222,8 @@ function mcpToForm(m: MCP): FormState {
     port: remote.port,
     path: remote.path,
     headersText: c.headers ? JSON.stringify(c.headers, null, 2) : "",
-    code: c.code ?? blank.code,
+    files: code.files,
+    entry: code.entry,
   };
 }
 
@@ -233,6 +257,7 @@ export function McpModal({
     error?: string | null;
   } | null>(null);
   const [testing, setTesting] = useState(false);
+  const [ideOpen, setIdeOpen] = useState(false);
 
   // sync the form whenever the modal opens for a (possibly different) MCP
   useEffect(() => {
@@ -244,7 +269,23 @@ export function McpModal({
         : { ...blank, project_ids: attachProjectId != null ? [attachProjectId] : [] },
     );
     setPreview(null);
+    setIdeOpen(false);
   }, [open, mcp, attachProjectId]);
+
+  // Switching to the "code" type drops the user into the full-screen editor,
+  // but only after they confirm they're entering code-editing mode.
+  const pickType = async (type: MCPType) => {
+    setForm((f) => ({ ...f, type }));
+    setPreview(null);
+    if (type === "code") {
+      const ok = await confirm({
+        title: t("editor.enterTitle"),
+        description: t("editor.enterDesc"),
+        confirmText: t("editor.enterCta"),
+      });
+      if (ok) setIdeOpen(true);
+    }
+  };
 
   const payload = (): MCPInput => ({
     name: form.name,
@@ -318,7 +359,8 @@ export function McpModal({
     }));
 
   return (
-    <Modal
+    <>
+      <Modal
       open={open}
       onClose={onClose}
       title={current ? t("mcps.editMcp") : t("mcps.newMcp")}
@@ -353,10 +395,7 @@ export function McpModal({
               <button
                 key={type}
                 type="button"
-                onClick={() => {
-                  setForm({ ...form, type });
-                  setPreview(null);
-                }}
+                onClick={() => pickType(type)}
                 className={cn(
                   "flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-colors",
                   active ? "border-primary bg-primary/5" : "border-border hover:bg-accent",
@@ -461,13 +500,39 @@ export function McpModal({
         )}
 
         {form.type === "code" && (
-          <Field label={t("mcps.pythonCode")} hint={t("mcps.pythonCodeHint")}>
-            <Textarea
-              value={form.code}
-              onChange={(e) => setForm({ ...form, code: e.target.value })}
-              rows={12}
-              className="font-mono text-[12px]"
-            />
+          <Field label={t("mcps.pythonProject")} hint={t("mcps.pythonProjectHint")}>
+            <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-[13px]">
+                  <Code2 className="size-4 text-primary" />
+                  <span className="font-medium">
+                    {Object.keys(form.files).length}{" "}
+                    {t(Object.keys(form.files).length === 1 ? "editor.fileOne" : "editor.fileOther")}
+                  </span>
+                  <span className="text-muted-foreground">·</span>
+                  <span className="text-muted-foreground">{t("editor.entry")}:</span>
+                  <code className="rounded bg-card px-1.5 py-0.5 font-mono text-[12px]">{form.entry}</code>
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={() => setIdeOpen(true)}>
+                  <Code2 className="size-4" /> {t("mcps.openEditor")}
+                </Button>
+              </div>
+              <ul className="flex max-h-28 flex-col gap-0.5 overflow-y-auto">
+                {Object.keys(form.files)
+                  .sort()
+                  .map((p) => (
+                    <li key={p} className="flex items-center gap-1.5 font-mono text-[12px] text-muted-foreground">
+                      <FileCode2 className="size-3.5 shrink-0 text-muted-foreground/60" />
+                      <span className="truncate">{p}</span>
+                      {p === form.entry && (
+                        <span className="rounded bg-primary/15 px-1 text-[10px] font-semibold text-primary">
+                          {t("editor.entry")}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+              </ul>
+            </div>
           </Field>
         )}
 
@@ -553,6 +618,19 @@ export function McpModal({
           </div>
         )}
       </div>
-    </Modal>
+      </Modal>
+
+      <CodeEditor
+        open={ideOpen}
+        files={form.files}
+        entry={form.entry}
+        title={form.name || t("mcps.newMcp")}
+        onSave={(files, entry) => {
+          setForm((f) => ({ ...f, type: "code", files, entry }));
+          setIdeOpen(false);
+        }}
+        onClose={() => setIdeOpen(false)}
+      />
+    </>
   );
 }
