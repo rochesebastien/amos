@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from sqlmodel import Session, select
 
 from ..models import Setting
+from . import net
 
 DEFAULTS = {
     "llm_base_url": "",
@@ -16,6 +17,8 @@ DEFAULTS = {
     "language": "en",
     # JSON-encoded list of model ids the user has activated for use in chat
     "enabled_models": "[]",
+    # Outbound proxy for every backend HTTP call ("" = direct connection).
+    "http_proxy": "",
 }
 
 
@@ -40,6 +43,17 @@ def all_settings(session: Session) -> dict[str, str]:
     for row in session.exec(select(Setting)).all():
         out[row.key] = row.value
     return out
+
+
+def refresh_proxy(session: Session) -> str:
+    """Sync the in-process outbound proxy from the stored setting.
+
+    Called on startup and whenever settings are read/updated so every httpx
+    client built via ``net.async_client`` picks up the current value.
+    """
+    proxy = get_setting(session, "http_proxy", "")
+    net.set_proxy(proxy)
+    return proxy
 
 
 @dataclass

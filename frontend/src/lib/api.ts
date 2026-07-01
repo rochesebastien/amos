@@ -18,6 +18,7 @@ export type Settings = {
   has_api_key: boolean;
   max_tool_iterations: number;
   language: string;
+  http_proxy: string; // outbound proxy for backend HTTP calls ("" = direct)
   enabled_models: EnabledModel[];
 };
 
@@ -27,6 +28,7 @@ export type SettingsUpdate = {
   llm_api_key?: string;
   max_tool_iterations?: number;
   language?: string;
+  http_proxy?: string; // "" clears it (direct connection)
   enabled_models?: EnabledModelUpdate[];
 };
 

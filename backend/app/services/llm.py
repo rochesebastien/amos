@@ -13,6 +13,7 @@ from typing import Any, Optional
 
 import httpx
 
+from . import net
 from .config import LLMConfig
 from .mcp_runtime import ToolRegistry, execute
 
@@ -32,7 +33,7 @@ def _headers(cfg: LLMConfig) -> dict:
 
 
 async def list_models(cfg: LLMConfig) -> list[str]:
-    async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+    async with net.async_client(timeout=20, follow_redirects=True) as client:
         r = await client.get(_endpoint(cfg.base_url, "models"), headers=_headers(cfg))
         r.raise_for_status()
         data = r.json()
@@ -116,7 +117,7 @@ async def stream_chat(
     tools = registry.openai_tools if registry else []
     working = list(messages)
 
-    async with httpx.AsyncClient(timeout=None) as client:
+    async with net.async_client(timeout=None) as client:
         for _ in range(max(1, max_iterations)):
             content = ""
             calls: list[dict] = []

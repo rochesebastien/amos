@@ -31,6 +31,7 @@ export function ModelsSettings() {
 
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [proxy, setProxy] = useState("");
   const [maxIters, setMaxIters] = useState(6);
   const [discovered, setDiscovered] = useState<string[]>([]);
   const [enabled, setEnabled] = useState<Row[]>([]);
@@ -45,6 +46,7 @@ export function ModelsSettings() {
   useEffect(() => {
     if (!settings) return;
     setBaseUrl(settings.llm_base_url);
+    setProxy(settings.http_proxy);
     setMaxIters(settings.max_tool_iterations);
     setDefaultModel(settings.llm_model);
     setEnabled(
@@ -71,6 +73,7 @@ export function ModelsSettings() {
     try {
       await mutation.mutateAsync({
         llm_base_url: baseUrl,
+        http_proxy: proxy,
         ...(apiKey ? { llm_api_key: apiKey } : {}),
       });
       const res = await api.discoverModels();
@@ -120,6 +123,7 @@ export function ModelsSettings() {
     try {
       const body: any = {
         llm_base_url: baseUrl,
+        http_proxy: proxy,
         max_tool_iterations: maxIters,
         llm_model: defaultModel,
         enabled_models: enabled.map((e) => ({
@@ -185,6 +189,14 @@ export function ModelsSettings() {
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               placeholder={settings?.has_api_key ? "••••••••" : "sk-…"}
+            />
+          </Field>
+
+          <Field label={t("settings.proxy")} hint={t("settings.proxy.hint")}>
+            <Input
+              value={proxy}
+              onChange={(e) => setProxy(e.target.value)}
+              placeholder={t("settings.proxy.placeholder")}
             />
           </Field>
 
