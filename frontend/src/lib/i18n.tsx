@@ -171,6 +171,10 @@ const dict: Record<Lang, Record<string, string>> = {
     "composer.noMcpsYet": "No MCPs yet.",
     "composer.manageMcps": "Manage MCPs",
     "composer.clearProject": "Remove project",
+    "composer.attachToProject": "Attach to this project",
+    "composer.availability": "Availability (all chats)",
+    "composer.mcpEnabled": "Enabled",
+    "composer.mcpDisabled": "Disabled",
 
     // projects
     "projects.subtitle": "Group conversations, set a pre-prompt, and attach MCP tools.",
@@ -206,6 +210,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "mcps.projects": "projects",
     "mcps.enabled": "Enabled",
     "mcps.disabled": "Disabled",
+    "mcps.toolsTitle": "Tools",
+    "mcps.toolsActiveOfTotal": "{active}/{total} on",
     "mcps.editMcp": "Edit MCP",
     "mcps.testing": "Testing…",
     "mcps.previewTools": "Preview tools",
@@ -428,6 +434,10 @@ const dict: Record<Lang, Record<string, string>> = {
     "composer.noMcpsYet": "Aucun MCP pour l’instant.",
     "composer.manageMcps": "Gérer les MCPs",
     "composer.clearProject": "Retirer le projet",
+    "composer.attachToProject": "Rattacher à ce projet",
+    "composer.availability": "Disponibilité (toutes les discussions)",
+    "composer.mcpEnabled": "Activé",
+    "composer.mcpDisabled": "Désactivé",
 
     // projects
     "projects.subtitle": "Regroupez des conversations, définissez un pré-prompt et associez des outils MCP.",
@@ -463,6 +473,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "mcps.projects": "projets",
     "mcps.enabled": "Activé",
     "mcps.disabled": "Désactivé",
+    "mcps.toolsTitle": "Outils",
+    "mcps.toolsActiveOfTotal": "{active}/{total} actifs",
     "mcps.editMcp": "Modifier le MCP",
     "mcps.testing": "Test en cours…",
     "mcps.previewTools": "Prévisualiser les outils",

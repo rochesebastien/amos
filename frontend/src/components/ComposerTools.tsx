@@ -11,10 +11,11 @@ import {
   Settings,
 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
-import { type MCP, type Project } from "@/lib/api";
-import { useMcps, useProjects, useProjectMutations } from "@/lib/queries";
+import { mcpToInput, type MCP, type MCPInput, type Project } from "@/lib/api";
+import { useMcps, useProjects, useProjectMutations, useMcpMutations } from "@/lib/queries";
 import { McpModal, MCP_TYPE_ICON } from "@/components/McpModal";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import {
@@ -52,6 +53,7 @@ export function ComposerAddMenu({
   const { data: projects = [] } = useProjects();
   const { data: mcps = [] } = useMcps();
   const projectMutations = useProjectMutations();
+  const mcpMutations = useMcpMutations();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [mcpModal, setMcpModal] = useState<{ open: boolean; editing: MCP | null }>({
@@ -79,6 +81,19 @@ export function ComposerAddMenu({
       },
     });
   };
+
+  // global (all chats) MCP controls — a full-document PUT overriding one field.
+  const patchMcp = (m: MCP, body: Partial<MCPInput>) =>
+    mcpMutations.update.mutate({ id: m.id, body: mcpToInput(m, body) });
+
+  const toggleMcpEnabled = (m: MCP) => patchMcp(m, { enabled: !m.enabled });
+
+  const toggleTool = (m: MCP, name: string) =>
+    patchMcp(m, {
+      disabled_tools: m.disabled_tools.includes(name)
+        ? m.disabled_tools.filter((x) => x !== name)
+        : [...m.disabled_tools, name],
+    });
 
   const launch = (fn: () => void) => {
     setMenuOpen(false);
@@ -165,36 +180,90 @@ export function ComposerAddMenu({
                   const Icon = MCP_TYPE_ICON[m.type];
                   const attached = activeProject.mcp_ids.includes(m.id);
                   return (
-                    <DropdownMenuItem
-                      key={m.id}
-                      onSelect={(e) => {
-                        e.preventDefault();
-                        toggleMcpAttach(m);
-                      }}
-                    >
-                      <span className="flex size-3.5 shrink-0 items-center justify-center">
-                        {attached && <Check className="size-3.5 text-primary" />}
-                      </span>
-                      <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-                      <span className="flex-1 truncate">{m.name}</span>
-                      <span className="shrink-0 text-[11px] text-muted-foreground">
-                        {t(m.tool_count === 1 ? "chat.toolCountOne" : "chat.toolCountOther", {
-                          n: m.tool_count,
-                        })}
-                      </span>
-                      <button
-                        type="button"
-                        aria-label={t("mcps.edit")}
-                        className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-background hover:text-foreground"
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          launch(() => setMcpModal({ open: true, editing: m }));
-                        }}
-                      >
-                        <Pencil className="size-3" />
-                      </button>
-                    </DropdownMenuItem>
+                    <DropdownMenuSub key={m.id}>
+                      <DropdownMenuSubTrigger>
+                        <span className="flex size-3.5 shrink-0 items-center justify-center">
+                          {attached && <Check className="size-3.5 text-primary" />}
+                        </span>
+                        <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+                        <span className="flex-1 truncate">{m.name}</span>
+                        <span className="shrink-0 text-[11px] text-muted-foreground">
+                          {m.enabled
+                            ? t(m.tool_count === 1 ? "chat.toolCountOne" : "chat.toolCountOther", {
+                                n: m.tool_count,
+                              })
+                            : t("mcps.disabled")}
+                        </span>
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent className="max-h-[60vh] w-72 overflow-y-auto">
+                        <DropdownMenuItem
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            toggleMcpAttach(m);
+                          }}
+                        >
+                          <span className="flex size-3.5 shrink-0 items-center justify-center">
+                            {attached && <Check className="size-3.5 text-primary" />}
+                          </span>
+                          <span className="flex-1">{t("composer.attachToProject")}</span>
+                        </DropdownMenuItem>
+
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel>{t("composer.availability")}</DropdownMenuLabel>
+
+                        <DropdownMenuItem
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            toggleMcpEnabled(m);
+                          }}
+                        >
+                          <Switch
+                            checked={m.enabled}
+                            onCheckedChange={() => {}}
+                            className="pointer-events-none"
+                          />
+                          <span className="flex-1">
+                            {m.enabled ? t("composer.mcpEnabled") : t("composer.mcpDisabled")}
+                          </span>
+                        </DropdownMenuItem>
+
+                        {m.enabled && m.tools.length > 0 && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuLabel>{t("mcps.toolsTitle")}</DropdownMenuLabel>
+                            {m.tools.map((tool) => {
+                              const on = !m.disabled_tools.includes(tool.name);
+                              return (
+                                <DropdownMenuItem
+                                  key={tool.name}
+                                  onSelect={(e) => {
+                                    e.preventDefault();
+                                    toggleTool(m, tool.name);
+                                  }}
+                                >
+                                  <Switch
+                                    checked={on}
+                                    onCheckedChange={() => {}}
+                                    className="pointer-events-none"
+                                  />
+                                  <span className="flex-1 truncate font-mono text-[12px]">
+                                    {tool.name}
+                                  </span>
+                                </DropdownMenuItem>
+                              );
+                            })}
+                          </>
+                        )}
+
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onSelect={() => launch(() => setMcpModal({ open: true, editing: m }))}
+                        >
+                          <Pencil className="size-3.5 text-muted-foreground" />
+                          <span className="flex-1">{t("mcps.edit")}</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
                   );
                 })
               )}

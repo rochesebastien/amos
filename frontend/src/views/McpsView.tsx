@@ -8,8 +8,11 @@ import {
   CheckCircle2,
   XCircle,
   RefreshCw,
+  Wrench,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
-import { api, type MCP, type ToolPreview } from "@/lib/api";
+import { api, mcpToInput, type MCP, type MCPInput, type ToolPreview } from "@/lib/api";
 import { useMcpMutations, useMcps } from "@/lib/queries";
 import { McpModal, MCP_TYPE_ICON } from "@/components/McpModal";
 import { Button } from "@/components/ui/button";
@@ -49,20 +52,6 @@ export function McpsView() {
     await mutations.remove.mutateAsync(m.id);
   };
 
-  const toggleEnabled = async (m: MCP) => {
-    await mutations.update.mutateAsync({
-      id: m.id,
-      body: {
-        name: m.name,
-        description: m.description,
-        type: m.type,
-        enabled: !m.enabled,
-        config: m.config,
-        project_ids: m.project_ids,
-      },
-    });
-  };
-
   return (
     <div className="flex min-w-0 flex-1 flex-col">
       <header className="flex items-center justify-between gap-4 px-6 pt-8 pb-4">
@@ -82,66 +71,133 @@ export function McpsView() {
           <EmptyState onNew={openNew} />
         ) : (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {mcps.map((m) => {
-              const Icon = MCP_TYPE_ICON[m.type];
-              return (
-                <div
-                  key={m.id}
-                  className="group flex flex-col rounded-xl border border-border bg-card p-4 transition-shadow hover:shadow-sm"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <Icon className="size-4 text-primary" />
-                      <h3 className="font-display text-base">{m.name}</h3>
-                    </div>
-                    <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button size="icon" variant="ghost" onClick={() => openEdit(m)}>
-                            <Pencil className="size-3.5" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>{t("mcps.edit")}</TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button size="icon" variant="ghost" onClick={() => remove(m)}>
-                            <Trash2 className="size-3.5" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>{t("common.delete")}</TooltipContent>
-                      </Tooltip>
-                    </div>
-                  </div>
-                  {m.description && (
-                    <p className="mt-1.5 line-clamp-2 text-[13px] text-muted-foreground">
-                      {m.description}
-                    </p>
-                  )}
-                  <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                    <Badge variant="outline">{t(`mcps.type.${m.type}.label`)}</Badge>
-                    {m.project_ids.length > 0 && (
-                      <Badge variant="primary">
-                        {m.project_ids.length}{" "}
-                        {t(m.project_ids.length > 1 ? "mcps.projects" : "mcps.project")}
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
-                    <label className="flex items-center gap-2 text-[13px] text-muted-foreground">
-                      <Switch checked={m.enabled} onCheckedChange={() => toggleEnabled(m)} />
-                      {m.enabled ? t("mcps.enabled") : t("mcps.disabled")}
-                    </label>
-                    <TestButton mcp={m} />
-                  </div>
-                </div>
-              );
-            })}
+            {mcps.map((m) => (
+              <McpCard key={m.id} mcp={m} onEdit={openEdit} onRemove={remove} />
+            ))}
           </div>
         )}
       </div>
 
       <McpModal open={open} onClose={() => setOpen(false)} mcp={editing} />
+    </div>
+  );
+}
+
+function McpCard({
+  mcp: m,
+  onEdit,
+  onRemove,
+}: {
+  mcp: MCP;
+  onEdit: (m: MCP) => void;
+  onRemove: (m: MCP) => void;
+}) {
+  const t = useT();
+  const mutations = useMcpMutations();
+  const [showTools, setShowTools] = useState(false);
+  const Icon = MCP_TYPE_ICON[m.type];
+
+  // full-document PUT: preserve everything, override only what changed.
+  const patch = (body: Partial<MCPInput>) =>
+    mutations.update.mutate({ id: m.id, body: mcpToInput(m, body) });
+
+  const toggleTool = (name: string) =>
+    patch({
+      disabled_tools: m.disabled_tools.includes(name)
+        ? m.disabled_tools.filter((x) => x !== name)
+        : [...m.disabled_tools, name],
+    });
+
+  return (
+    <div className="group flex flex-col rounded-xl border border-border bg-card p-4 transition-shadow hover:shadow-sm">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Icon className="size-4 text-primary" />
+          <h3 className="font-display text-base">{m.name}</h3>
+        </div>
+        <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button size="icon" variant="ghost" onClick={() => onEdit(m)}>
+                <Pencil className="size-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{t("mcps.edit")}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button size="icon" variant="ghost" onClick={() => onRemove(m)}>
+                <Trash2 className="size-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{t("common.delete")}</TooltipContent>
+          </Tooltip>
+        </div>
+      </div>
+      {m.description && (
+        <p className="mt-1.5 line-clamp-2 text-[13px] text-muted-foreground">{m.description}</p>
+      )}
+      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+        <Badge variant="outline">{t(`mcps.type.${m.type}.label`)}</Badge>
+        {m.project_ids.length > 0 && (
+          <Badge variant="primary">
+            {m.project_ids.length}{" "}
+            {t(m.project_ids.length > 1 ? "mcps.projects" : "mcps.project")}
+          </Badge>
+        )}
+      </div>
+      <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+        <label className="flex items-center gap-2 text-[13px] text-muted-foreground">
+          <Switch checked={m.enabled} onCheckedChange={() => patch({ enabled: !m.enabled })} />
+          {m.enabled ? t("mcps.enabled") : t("mcps.disabled")}
+        </label>
+        <TestButton mcp={m} />
+      </div>
+
+      {/* per-tool switches — turn individual tools off without disabling the MCP */}
+      {m.enabled && m.tools.length > 0 && (
+        <div className="mt-3 border-t border-border pt-3">
+          <button
+            type="button"
+            onClick={() => setShowTools((v) => !v)}
+            className="flex w-full items-center gap-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <Wrench className="size-3.5 text-primary" />
+            <span className="flex-1 text-left">{t("mcps.toolsTitle")}</span>
+            <span className="text-[11px] text-muted-foreground">
+              {t("mcps.toolsActiveOfTotal", { active: m.tool_count, total: m.tools.length })}
+            </span>
+            {showTools ? (
+              <ChevronDown className="size-3.5" />
+            ) : (
+              <ChevronRight className="size-3.5" />
+            )}
+          </button>
+          {showTools && (
+            <ul className="mt-2 flex flex-col gap-2">
+              {m.tools.map((tool) => (
+                <li key={tool.name} className="flex items-start gap-2">
+                  <Switch
+                    className="mt-0.5"
+                    checked={!m.disabled_tools.includes(tool.name)}
+                    onCheckedChange={() => toggleTool(tool.name)}
+                  />
+                  <div className="flex min-w-0 flex-col">
+                    <code className="truncate font-mono text-[12px] text-foreground">
+                      {tool.name}
+                    </code>
+                    {tool.description && (
+                      <span className="line-clamp-1 text-[11px] text-muted-foreground">
+                        {tool.description}
+                      </span>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }

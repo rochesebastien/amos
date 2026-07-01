@@ -59,6 +59,9 @@ type FormState = {
   description: string;
   type: MCPType;
   enabled: boolean;
+  // per-tool disables are managed via switches elsewhere; carried here only so
+  // saving the modal preserves them (the PUT is a full-document replace).
+  disabled_tools: string[];
   project_ids: number[];
   // openapi
   specUrl: string;
@@ -81,6 +84,7 @@ const blank: FormState = {
   description: "",
   type: "openapi",
   enabled: true,
+  disabled_tools: [],
   project_ids: [],
   specUrl: "",
   specText: "",
@@ -213,6 +217,7 @@ function mcpToForm(m: MCP): FormState {
     description: m.description,
     type: m.type,
     enabled: m.enabled,
+    disabled_tools: m.disabled_tools,
     project_ids: m.project_ids,
     specUrl: c.spec_url ?? "",
     specText: c.spec ? JSON.stringify(c.spec, null, 2) : "",
@@ -292,6 +297,7 @@ export function McpModal({
     description: form.description,
     type: form.type,
     enabled: form.enabled,
+    disabled_tools: form.disabled_tools,
     config: buildConfig(form),
     project_ids: form.project_ids,
   });

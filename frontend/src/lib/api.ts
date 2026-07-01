@@ -55,14 +55,25 @@ export type ProjectInput = {
 
 export type MCPType = "remote" | "code" | "openapi";
 
+export type ToolPreview = {
+  name: string;
+  description: string;
+  parameters: Record<string, any>;
+};
+
 export type MCP = {
   id: number;
   name: string;
   description: string;
   type: MCPType;
   enabled: boolean;
+  /** Raw names of tools turned off globally (active = enabled && not here). */
+  disabled_tools: string[];
   config: Record<string, any>;
   project_ids: number[];
+  /** Every tool the MCP exposes, so the UI can render a switch per tool. */
+  tools: ToolPreview[];
+  /** Count of currently active (non-disabled) tools. */
   tool_count: number;
   created_at: string;
   updated_at: string;
@@ -73,15 +84,28 @@ export type MCPInput = {
   description?: string;
   type: MCPType;
   enabled?: boolean;
+  disabled_tools?: string[];
   config?: Record<string, any>;
   project_ids?: number[];
 };
 
-export type ToolPreview = {
-  name: string;
-  description: string;
-  parameters: Record<string, any>;
-};
+/**
+ * Build a full MCP update body from an existing record, optionally overriding
+ * some fields. Updates are full-document PUTs, so callers that only tweak one
+ * field (an enable switch, a per-tool toggle) still need to resend the rest.
+ */
+export function mcpToInput(m: MCP, patch: Partial<MCPInput> = {}): MCPInput {
+  return {
+    name: m.name,
+    description: m.description,
+    type: m.type,
+    enabled: m.enabled,
+    disabled_tools: m.disabled_tools,
+    config: m.config,
+    project_ids: m.project_ids,
+    ...patch,
+  };
+}
 
 export type MCPTestResult = {
   ok: boolean;
