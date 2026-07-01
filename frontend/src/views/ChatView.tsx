@@ -91,8 +91,9 @@ function historyToUI(messages: Message[]): UIMsg[] {
         name: tc.function?.name ?? "tool",
         args: tc.function?.arguments,
       }));
-      if (m.content || tools.length)
-        out.push({ role: "assistant", content: m.content, tools });
+      const error: string | undefined = m.extra?.error;
+      if (m.content || tools.length || error)
+        out.push({ role: "assistant", content: m.content, tools, error });
     } else if (m.role === "tool") {
       // attach result to the most recent assistant tool by id
       const last = out[out.length - 1];
@@ -502,7 +503,7 @@ function ChatMessage({ msg, streaming }: { msg: UIMsg; streaming: boolean }) {
     );
   }
 
-  const thinking = streaming && !msg.content && !msg.tools?.length;
+  const thinking = streaming && !msg.content && !msg.tools?.length && !msg.error;
 
   return (
     <MessageRow align="start">
