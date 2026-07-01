@@ -66,11 +66,18 @@ class ProjectOut(BaseModel):
 MCPType = Literal["remote", "code", "openapi"]
 
 
+class ToolPreview(BaseModel):
+    name: str
+    description: str = ""
+    parameters: dict[str, Any] = {}
+
+
 class MCPIn(BaseModel):
     name: str
     description: str = ""
     type: MCPType = "openapi"
     enabled: bool = True
+    disabled_tools: list[str] = []
     config: dict[str, Any] = {}
     project_ids: list[int] = []
 
@@ -81,17 +88,15 @@ class MCPOut(BaseModel):
     description: str
     type: str
     enabled: bool
+    disabled_tools: list[str] = []
     config: dict[str, Any]
     project_ids: list[int]
+    # every tool the MCP exposes (so the UI can render a switch per tool);
+    # `tool_count` reflects only the currently *active* (non-disabled) tools.
+    tools: list[ToolPreview] = []
     tool_count: int = 0
     created_at: datetime
     updated_at: datetime
-
-
-class ToolPreview(BaseModel):
-    name: str
-    description: str = ""
-    parameters: dict[str, Any] = {}
 
 
 class MCPTestResult(BaseModel):

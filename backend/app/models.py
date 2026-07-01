@@ -50,6 +50,9 @@ class MCP(SQLModel, table=True):
     # type: "remote" | "code" | "openapi"
     type: str = "openapi"
     enabled: bool = True
+    # individual tools (by their raw name) turned off globally. A tool is active
+    # when the MCP is enabled AND its name is not in this list.
+    disabled_tools: list = Field(default_factory=list, sa_column=Column(JSON))
     # type-specific configuration (urls, code, spec, headers, base_url, ...)
     config: dict = Field(default_factory=dict, sa_column=Column(JSON))
     created_at: datetime = Field(default_factory=_now)

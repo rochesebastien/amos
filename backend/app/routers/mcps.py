@@ -27,26 +27,39 @@ def _set_links(session: Session, mcp_id: int, project_ids: list[int]) -> None:
         session.add(ProjectMCPLink(project_id=pid, mcp_id=mcp_id))
 
 
-async def _tool_count(m: MCP) -> int:
-    """Best-effort count of tools exposed by an MCP; 0 if it can't be reached."""
+async def _list_tools(m: MCP) -> list[dict]:
+    """Best-effort list of tools exposed by an MCP; empty if it can't be reached."""
     if not m.enabled:
-        return 0
+        return []
     try:
-        return len(await mcp_runtime.list_mcp_tools(m))
+        return await mcp_runtime.list_mcp_tools(m)
     except Exception:
-        return 0
+        return []
 
 
-def _to_out(session: Session, m: MCP, tool_count: int = 0) -> MCPOut:
+def _to_out(session: Session, m: MCP, tools: list[dict] | None = None) -> MCPOut:
+    tools = tools or []
+    disabled = set(m.disabled_tools or [])
+    previews = [
+        ToolPreview(
+            name=t["name"],
+            description=t.get("description", ""),
+            parameters=t.get("parameters", {}),
+        )
+        for t in tools
+    ]
+    active = sum(1 for t in tools if t["name"] not in disabled)
     return MCPOut(
         id=m.id,
         name=m.name,
         description=m.description,
         type=m.type,
         enabled=m.enabled,
+        disabled_tools=list(m.disabled_tools or []),
         config=m.config,
         project_ids=_project_ids(session, m.id),
-        tool_count=tool_count,
+        tools=previews,
+        tool_count=active,
         created_at=m.created_at,
         updated_at=m.updated_at,
     )
@@ -55,8 +68,8 @@ def _to_out(session: Session, m: MCP, tool_count: int = 0) -> MCPOut:
 @router.get("", response_model=list[MCPOut])
 async def list_mcps(session: Session = Depends(get_session)) -> list[MCPOut]:
     mcps = session.exec(select(MCP).order_by(MCP.updated_at.desc())).all()
-    counts = await asyncio.gather(*(_tool_count(m) for m in mcps))
-    return [_to_out(session, m, c) for m, c in zip(mcps, counts)]
+    tools = await asyncio.gather(*(_list_tools(m) for m in mcps))
+    return [_to_out(session, m, ts) for m, ts in zip(mcps, tools)]
 
 
 @router.post("", response_model=MCPOut)
@@ -66,6 +79,7 @@ async def create_mcp(body: MCPIn, session: Session = Depends(get_session)) -> MC
         description=body.description,
         type=body.type,
         enabled=body.enabled,
+        disabled_tools=body.disabled_tools,
         config=body.config,
     )
     session.add(m)
@@ -73,7 +87,7 @@ async def create_mcp(body: MCPIn, session: Session = Depends(get_session)) -> MC
     session.refresh(m)
     _set_links(session, m.id, body.project_ids)
     session.commit()
-    return _to_out(session, m, await _tool_count(m))
+    return _to_out(session, m, await _list_tools(m))
 
 
 @router.get("/{mcp_id}", response_model=MCPOut)
@@ -81,7 +95,7 @@ async def get_mcp(mcp_id: int, session: Session = Depends(get_session)) -> MCPOu
     m = session.get(MCP, mcp_id)
     if not m:
         raise HTTPException(404, "MCP not found")
-    return _to_out(session, m, await _tool_count(m))
+    return _to_out(session, m, await _list_tools(m))
 
 
 @router.put("/{mcp_id}", response_model=MCPOut)
@@ -93,13 +107,14 @@ async def update_mcp(mcp_id: int, body: MCPIn, session: Session = Depends(get_se
     m.description = body.description
     m.type = body.type
     m.enabled = body.enabled
+    m.disabled_tools = body.disabled_tools
     m.config = body.config
     m.updated_at = datetime.now(timezone.utc)
     session.add(m)
     _set_links(session, m.id, body.project_ids)
     session.commit()
     session.refresh(m)
-    return _to_out(session, m, await _tool_count(m))
+    return _to_out(session, m, await _list_tools(m))
 
 
 @router.delete("/{mcp_id}")

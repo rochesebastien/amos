@@ -50,7 +50,10 @@ async def build_registry(mcps: list[MCP]) -> ToolRegistry:
             # a broken MCP should not take down the whole chat
             continue
         prefix = _slug(mcp.name)
+        disabled = set(mcp.disabled_tools or [])
         for t in tools:
+            if t["name"] in disabled:
+                continue
             base = f"{prefix}__{t['name']}"
             name = base
             i = 1
