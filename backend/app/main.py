@@ -8,13 +8,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from .db import init_db
+from sqlmodel import Session
+
+from .db import engine, init_db
 from .routers import chat, conversations, mcps, projects, settings, storage
+from .services import config as cfg
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    # Load the configured outbound proxy into the shared httpx client factory.
+    with Session(engine) as session:
+        cfg.refresh_proxy(session)
     yield
 
 

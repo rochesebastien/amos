@@ -11,6 +11,8 @@ from typing import Any
 
 import httpx
 
+from . import net
+
 PROTOCOL_VERSION = "2024-11-05"
 
 
@@ -85,7 +87,7 @@ def resolve_url(config: dict) -> str:
 def _client(config: dict) -> tuple[httpx.AsyncClient, str]:
     url = resolve_url(config)
     headers = dict(config.get("headers") or {})
-    return httpx.AsyncClient(timeout=60, follow_redirects=True, headers=headers), url
+    return net.async_client(timeout=60, follow_redirects=True, headers=headers), url
 
 
 async def _initialize(client: httpx.AsyncClient, url: str) -> None:

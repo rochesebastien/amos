@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from typing import Any, Optional
 
-import httpx
+from . import net
 
 HTTP_METHODS = ("get", "post", "put", "patch", "delete")
 
@@ -130,7 +130,7 @@ def build_tools(spec: dict) -> list[dict]:
 
 
 async def fetch_spec(url: str) -> dict:
-    async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+    async with net.async_client(timeout=30, follow_redirects=True) as client:
         r = await client.get(url)
         r.raise_for_status()
         return r.json()
@@ -170,7 +170,7 @@ async def execute(config: dict, tool: dict, arguments: dict) -> Any:
     headers = dict(config.get("headers") or {})
     json_body = arguments.get("body") if tool.get("_has_body") else None
 
-    async with httpx.AsyncClient(timeout=60, follow_redirects=True) as client:
+    async with net.async_client(timeout=60, follow_redirects=True) as client:
         r = await client.request(
             tool["_method"].upper(),
             base + path,

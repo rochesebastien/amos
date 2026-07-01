@@ -27,6 +27,7 @@ class SettingsOut(BaseModel):
     has_api_key: bool = False  # never leak the key itself
     max_tool_iterations: int = 6
     language: str = "en"
+    http_proxy: str = ""  # outbound proxy for backend HTTP calls ("" = direct)
     enabled_models: list[EnabledModelOut] = []  # models activated for use in chat
 
 
@@ -36,6 +37,7 @@ class SettingsIn(BaseModel):
     llm_api_key: Optional[str] = None  # write-only; "" clears it
     max_tool_iterations: Optional[int] = None
     language: Optional[str] = None
+    http_proxy: Optional[str] = None  # "" clears it (direct connection)
     enabled_models: Optional[list[EnabledModelIn]] = None
 
 

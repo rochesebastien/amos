@@ -24,12 +24,15 @@ def read_settings(session: Session = Depends(get_session)) -> SettingsOut:
         )
         for m in cfg.parse_enabled_models(s.get("enabled_models", "[]"))
     ]
+    # keep the in-process proxy in sync (covers restarts and data imports)
+    cfg.refresh_proxy(session)
     return SettingsOut(
         llm_base_url=s.get("llm_base_url", ""),
         llm_model=s.get("llm_model", ""),
         has_api_key=bool(s.get("llm_api_key")),
         max_tool_iterations=int(s.get("max_tool_iterations", "6") or 6),
         language=s.get("language", "en") or "en",
+        http_proxy=s.get("http_proxy", "") or "",
         enabled_models=enabled,
     )
 
@@ -47,6 +50,9 @@ def update_settings(body: SettingsIn, session: Session = Depends(get_session)) -
         cfg.set_setting(session, "max_tool_iterations", str(max(1, min(20, body.max_tool_iterations))))
     if body.language is not None:
         cfg.set_setting(session, "language", body.language.strip() or "en")
+    if body.http_proxy is not None:
+        # empty string clears the proxy (direct connection)
+        cfg.set_setting(session, "http_proxy", body.http_proxy.strip())
     if body.enabled_models is not None:
         existing = {m["id"]: m for m in cfg.get_enabled_models(session)}
         out: list[dict] = []
