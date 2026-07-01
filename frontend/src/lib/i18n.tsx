@@ -160,6 +160,18 @@ const dict: Record<Lang, Record<string, string>> = {
     "chat.hide": "hide",
     "chat.details": "details",
 
+    // composer "+" menu
+    "composer.add": "Add",
+    "composer.attachFiles": "Add files or photos",
+    "composer.addToProject": "Add to project",
+    "composer.manageProjects": "Manage projects",
+    "composer.mcpTools": "MCP tools",
+    "composer.mcpToolsLabel": "Tools attached to this project",
+    "composer.mcpPickProject": "Pick a project to attach MCP tools.",
+    "composer.noMcpsYet": "No MCPs yet.",
+    "composer.manageMcps": "Manage MCPs",
+    "composer.clearProject": "Remove project",
+
     // projects
     "projects.subtitle": "Group conversations, set a pre-prompt, and attach MCP tools.",
     "projects.new": "New project",
@@ -404,6 +416,18 @@ const dict: Record<Lang, Record<string, string>> = {
     "chat.running": "en cours…",
     "chat.hide": "masquer",
     "chat.details": "détails",
+
+    // composer "+" menu
+    "composer.add": "Ajouter",
+    "composer.attachFiles": "Ajouter des fichiers ou des photos",
+    "composer.addToProject": "Ajouter au projet",
+    "composer.manageProjects": "Gérer les projets",
+    "composer.mcpTools": "Outils MCP",
+    "composer.mcpToolsLabel": "Outils rattachés à ce projet",
+    "composer.mcpPickProject": "Choisissez un projet pour rattacher des outils MCP.",
+    "composer.noMcpsYet": "Aucun MCP pour l’instant.",
+    "composer.manageMcps": "Gérer les MCPs",
+    "composer.clearProject": "Retirer le projet",
 
     // projects
     "projects.subtitle": "Regroupez des conversations, définissez un pré-prompt et associez des outils MCP.",

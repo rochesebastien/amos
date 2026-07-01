@@ -34,10 +34,13 @@ export function ProjectModal({
   open,
   onClose,
   project,
+  onCreated,
 }: {
   open: boolean;
   onClose: () => void;
   project: Project | null;
+  /** Called with the freshly created project (create mode only). */
+  onCreated?: (project: Project) => void;
 }) {
   const t = useT();
   const { data: mcps = [] } = useMcps();
@@ -56,8 +59,12 @@ export function ProjectModal({
     if (!form.name.trim()) return;
     setSaving(true);
     try {
-      if (project) await mutations.update.mutateAsync({ id: project.id, body: form });
-      else await mutations.create.mutateAsync(form);
+      if (project) {
+        await mutations.update.mutateAsync({ id: project.id, body: form });
+      } else {
+        const created = await mutations.create.mutateAsync(form);
+        onCreated?.(created);
+      }
       onClose();
     } finally {
       setSaving(false);
