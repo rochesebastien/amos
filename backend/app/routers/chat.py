@@ -21,6 +21,20 @@ def _sse(event: dict) -> str:
     return f"data: {json.dumps(event, default=str)}\n\n"
 
 
+def _persist_error(session: Session, conversation_id: int, error: str) -> None:
+    """Store an assistant-side error marker so the red error bubble survives a
+    reload (the frontend reconstructs it from ``extra.error``)."""
+    session.add(
+        Message(
+            conversation_id=conversation_id,
+            role="assistant",
+            content="",
+            extra={"error": error},
+        )
+    )
+    session.commit()
+
+
 def _to_openai_messages(system_prompt: str, msgs: list[Message]) -> list[dict]:
     out: list[dict] = []
     if system_prompt.strip():
@@ -29,6 +43,9 @@ def _to_openai_messages(system_prompt: str, msgs: list[Message]) -> list[dict]:
         if m.role == "user":
             out.append({"role": "user", "content": m.content})
         elif m.role == "assistant":
+            # Skip UI-only error markers — they are not real model turns.
+            if m.extra.get("error"):
+                continue
             entry: dict = {"role": "assistant", "content": m.content or ""}
             if m.extra.get("tool_calls"):
                 entry["tool_calls"] = m.extra["tool_calls"]
@@ -87,10 +104,14 @@ async def _event_stream(body: ChatIn) -> AsyncIterator[str]:
         )
         llm_cfg = cfg.get_llm_config_for_model(session, model)
         if not llm_cfg.configured:
-            yield _sse({"type": "error", "error": "No model configured. Open Settings and connect your LiteLLM endpoint."})
+            err = "No model configured. Open Settings and connect your LiteLLM endpoint."
+            _persist_error(session, conv.id, err)
+            yield _sse({"type": "error", "error": err})
             return
         if not model:
-            yield _sse({"type": "error", "error": "No model selected. Pick a model in Settings."})
+            err = "No model selected. Pick a model in Settings."
+            _persist_error(session, conv.id, err)
+            yield _sse({"type": "error", "error": err})
             return
 
         # gather tools from attached + enabled MCPs

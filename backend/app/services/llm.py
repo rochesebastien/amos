@@ -128,7 +128,14 @@ async def stream_chat(
                         content = ev["content"]
                         calls = ev["tool_calls"]
             except Exception as exc:
-                yield {"type": "error", "error": str(exc)}
+                err = str(exc)
+                # Persist the failure as an assistant "error" message so the red
+                # error bubble survives a reload instead of only flashing live.
+                yield {
+                    "type": "persist",
+                    "message": {"role": "assistant", "content": content, "extra": {"error": err}},
+                }
+                yield {"type": "error", "error": err}
                 return
 
             if not calls:
@@ -177,4 +184,9 @@ async def stream_chat(
                     "message": {"role": "tool", "content": result_str, "extra": {"tool_call_id": call_id, "name": c["name"]}},
                 }
 
-        yield {"type": "error", "error": f"stopped after {max_iterations} tool iterations"}
+        err = f"stopped after {max_iterations} tool iterations"
+        yield {
+            "type": "persist",
+            "message": {"role": "assistant", "content": "", "extra": {"error": err}},
+        }
+        yield {"type": "error", "error": err}
