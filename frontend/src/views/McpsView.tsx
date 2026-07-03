@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Plug,
   Plus,
   Pencil,
+  Copy,
   Trash2,
   FlaskConical,
   CheckCircle2,
@@ -11,6 +12,10 @@ import {
   Wrench,
   ChevronDown,
   ChevronRight,
+  Search,
+  X,
+  ListChecks,
+  ListX,
 } from "lucide-react";
 import { api, mcpToInput, type MCP, type MCPInput, type ToolPreview } from "@/lib/api";
 import { useMcpMutations, useMcps } from "@/lib/queries";
@@ -95,11 +100,19 @@ function McpCard({
   const t = useT();
   const mutations = useMcpMutations();
   const [showTools, setShowTools] = useState(false);
+  const [query, setQuery] = useState("");
   const Icon = MCP_TYPE_ICON[m.type];
 
   // full-document PUT: preserve everything, override only what changed.
   const patch = (body: Partial<MCPInput>) =>
     mutations.update.mutate({ id: m.id, body: mcpToInput(m, body) });
+
+  // Clone every field into a brand-new MCP, tacking a localized copy suffix
+  // onto the name so the duplicate is easy to spot.
+  const duplicate = () =>
+    mutations.create.mutate(
+      mcpToInput(m, { name: `${m.name} ${t("mcps.copySuffix")}` }),
+    );
 
   const toggleTool = (name: string) =>
     patch({
@@ -107,6 +120,26 @@ function McpCard({
         ? m.disabled_tools.filter((x) => x !== name)
         : [...m.disabled_tools, name],
     });
+
+  // Filter by tool name OR description (case-insensitive).
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return m.tools;
+    return m.tools.filter(
+      (tool) =>
+        tool.name.toLowerCase().includes(q) ||
+        tool.description?.toLowerCase().includes(q),
+    );
+  }, [m.tools, query]);
+
+  // Bulk actions operate on the currently filtered set, so a search term
+  // scopes "enable/disable all" to the matching tools.
+  const enableAll = (names: string[]) => {
+    const drop = new Set(names);
+    patch({ disabled_tools: m.disabled_tools.filter((x) => !drop.has(x)) });
+  };
+  const disableAll = (names: string[]) =>
+    patch({ disabled_tools: [...new Set([...m.disabled_tools, ...names])] });
 
   return (
     <div className="group flex flex-col rounded-xl border border-border bg-card p-4 transition-shadow hover:shadow-sm">
@@ -116,6 +149,19 @@ function McpCard({
           <h3 className="font-display text-base">{m.name}</h3>
         </div>
         <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={duplicate}
+                disabled={mutations.create.isPending}
+              >
+                <Copy className="size-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{t("mcps.duplicate")}</TooltipContent>
+          </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button size="icon" variant="ghost" onClick={() => onEdit(m)}>
@@ -174,27 +220,85 @@ function McpCard({
             )}
           </button>
           {showTools && (
-            <ul className="mt-2 flex flex-col gap-2">
-              {m.tools.map((tool) => (
-                <li key={tool.name} className="flex items-start gap-2">
-                  <Switch
-                    className="mt-0.5"
-                    checked={!m.disabled_tools.includes(tool.name)}
-                    onCheckedChange={() => toggleTool(tool.name)}
+            <div className="mt-2 flex flex-col gap-2">
+              {/* search + bulk enable/disable of the filtered tools */}
+              <div className="flex items-center gap-1.5">
+                <div className="relative min-w-0 flex-1">
+                  <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder={t("mcps.searchTools")}
+                    className="h-8 w-full rounded-md border border-input bg-card pl-7 pr-7 text-[12px] text-foreground placeholder:text-muted-foreground outline-none transition-shadow focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
                   />
-                  <div className="flex min-w-0 flex-col">
-                    <code className="truncate font-mono text-[12px] text-foreground">
-                      {tool.name}
-                    </code>
-                    {tool.description && (
-                      <span className="line-clamp-1 text-[11px] text-muted-foreground">
-                        {tool.description}
-                      </span>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
+                  {query && (
+                    <button
+                      type="button"
+                      onClick={() => setQuery("")}
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  )}
+                </div>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      className="shrink-0"
+                      disabled={filtered.length === 0}
+                      onClick={() => enableAll(filtered.map((tool) => tool.name))}
+                    >
+                      <ListChecks className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{t("mcps.enableAll")}</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      className="shrink-0"
+                      disabled={filtered.length === 0}
+                      onClick={() => disableAll(filtered.map((tool) => tool.name))}
+                    >
+                      <ListX className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{t("mcps.disableAll")}</TooltipContent>
+                </Tooltip>
+              </div>
+
+              {filtered.length === 0 ? (
+                <p className="px-1 py-2 text-[12px] text-muted-foreground">
+                  {t("mcps.noToolsMatch", { query: query.trim() })}
+                </p>
+              ) : (
+                <ul className="flex max-h-64 flex-col gap-2 overflow-y-auto pr-1">
+                  {filtered.map((tool) => (
+                    <li key={tool.name} className="flex items-start gap-2">
+                      <Switch
+                        className="mt-0.5"
+                        checked={!m.disabled_tools.includes(tool.name)}
+                        onCheckedChange={() => toggleTool(tool.name)}
+                      />
+                      <div className="flex min-w-0 flex-col">
+                        <code className="truncate font-mono text-[12px] text-foreground">
+                          {tool.name}
+                        </code>
+                        {tool.description && (
+                          <span className="line-clamp-1 text-[11px] text-muted-foreground">
+                            {tool.description}
+                          </span>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           )}
         </div>
       )}
