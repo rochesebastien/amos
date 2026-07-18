@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -10,6 +11,15 @@ from ..models import Project, ProjectMCPLink
 from ..schemas import ProjectIn, ProjectOut
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
+
+
+def _norm_dir(directory: str) -> str:
+    """Normalise a project directory: expand ~ and make it absolute, but keep an
+    empty value empty (no directory linked)."""
+    directory = (directory or "").strip()
+    if not directory:
+        return ""
+    return os.path.abspath(os.path.expanduser(directory))
 
 
 def _mcp_ids(session: Session, project_id: int) -> list[int]:
@@ -32,6 +42,7 @@ def _to_out(session: Session, p: Project) -> ProjectOut:
         description=p.description,
         system_prompt=p.system_prompt,
         model=p.model,
+        directory=p.directory,
         mcp_ids=_mcp_ids(session, p.id),
         created_at=p.created_at,
         updated_at=p.updated_at,
@@ -51,6 +62,7 @@ def create_project(body: ProjectIn, session: Session = Depends(get_session)) -> 
         description=body.description,
         system_prompt=body.system_prompt,
         model=body.model,
+        directory=_norm_dir(body.directory),
     )
     session.add(p)
     session.commit()
@@ -77,6 +89,7 @@ def update_project(project_id: int, body: ProjectIn, session: Session = Depends(
     p.description = body.description
     p.system_prompt = body.system_prompt
     p.model = body.model
+    p.directory = _norm_dir(body.directory)
     p.updated_at = datetime.now(timezone.utc)
     session.add(p)
     _set_links(session, p.id, body.mcp_ids)

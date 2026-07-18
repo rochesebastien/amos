@@ -21,6 +21,10 @@ def _migrate() -> None:
     if "disabled_tools" not in mcp_cols:
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE mcp ADD COLUMN disabled_tools JSON DEFAULT '[]'"))
+    project_cols = {c["name"] for c in insp.get_columns("project")}
+    if "directory" not in project_cols:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE project ADD COLUMN directory VARCHAR DEFAULT ''"))
 
 
 def init_db() -> None:

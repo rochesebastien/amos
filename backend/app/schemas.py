@@ -49,6 +49,7 @@ class ProjectIn(BaseModel):
     description: str = ""
     system_prompt: str = ""
     model: str = ""
+    directory: str = ""
     mcp_ids: list[int] = []
 
 
@@ -58,6 +59,7 @@ class ProjectOut(BaseModel):
     description: str
     system_prompt: str
     model: str
+    directory: str
     mcp_ids: list[int]
     created_at: datetime
     updated_at: datetime

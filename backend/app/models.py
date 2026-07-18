@@ -37,6 +37,7 @@ class Project(SQLModel, table=True):
     description: str = ""
     system_prompt: str = ""  # the project "pre-prompt"
     model: str = ""  # optional per-project model override
+    directory: str = ""  # optional absolute path to a local repo (Agents mode)
     created_at: datetime = Field(default_factory=_now)
     updated_at: datetime = Field(default_factory=_now)
 

@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlmodel import Session
 
 from .db import engine, init_db
-from .routers import chat, conversations, mcps, projects, settings, storage
+from .routers import agent_files, chat, conversations, mcps, projects, settings, storage
 from .services import config as cfg
 
 
@@ -36,6 +36,7 @@ app.add_middleware(
 
 app.include_router(settings.router)
 app.include_router(projects.router)
+app.include_router(agent_files.router)
 app.include_router(mcps.router)
 app.include_router(conversations.router)
 app.include_router(chat.router)

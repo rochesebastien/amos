@@ -42,6 +42,7 @@ export type Project = {
   description: string;
   system_prompt: string;
   model: string;
+  directory: string; // absolute path of a linked local repo ("" = none)
   mcp_ids: number[];
   created_at: string;
   updated_at: string;
@@ -52,7 +53,37 @@ export type ProjectInput = {
   description?: string;
   system_prompt?: string;
   model?: string;
+  directory?: string;
   mcp_ids?: number[];
+};
+
+// ---- Agents mode (a project's linked directory) ----------------------------
+
+export type AgentFileKind = "instructions" | "agent" | "skill";
+export type AgentProvider = "claude" | "codex";
+
+export type AgentFile = {
+  path: string; // relative, posix
+  name: string;
+  kind: AgentFileKind;
+  provider: AgentProvider;
+  size: number;
+  modified_at: string;
+  is_symlink: boolean;
+  symlink_target: string | null;
+};
+
+export type AgentDirOverview = {
+  directory: string;
+  exists: boolean;
+  files: AgentFile[];
+};
+
+export type AgentFileContent = {
+  path: string;
+  content: string;
+  is_symlink: boolean;
+  symlink_target: string | null;
 };
 
 export type MCPType = "remote" | "code" | "openapi";
@@ -175,6 +206,29 @@ export const api = {
   updateProject: (id: number, body: ProjectInput) =>
     req<Project>(`/api/projects/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   deleteProject: (id: number) => req<{ ok: boolean }>(`/api/projects/${id}`, { method: "DELETE" }),
+
+  // agent files (a project's linked directory)
+  getAgentDir: (projectId: number) =>
+    req<AgentDirOverview>(`/api/projects/${projectId}/agent-dir`),
+  getAgentFile: (projectId: number, path: string) =>
+    req<AgentFileContent>(
+      `/api/projects/${projectId}/agent-dir/file?path=${encodeURIComponent(path)}`,
+    ),
+  saveAgentFile: (projectId: number, path: string, content: string) =>
+    req<AgentFile>(`/api/projects/${projectId}/agent-dir/file`, {
+      method: "PUT",
+      body: JSON.stringify({ path, content }),
+    }),
+  deleteAgentFile: (projectId: number, path: string) =>
+    req<{ ok: boolean }>(
+      `/api/projects/${projectId}/agent-dir/file?path=${encodeURIComponent(path)}`,
+      { method: "DELETE" },
+    ),
+  createAgentSymlink: (projectId: number, linkPath: string, targetPath: string) =>
+    req<AgentFile>(`/api/projects/${projectId}/agent-dir/symlink`, {
+      method: "POST",
+      body: JSON.stringify({ link_path: linkPath, target_path: targetPath }),
+    }),
 
   // mcps
   listMcps: () => req<MCP[]>("/api/mcps"),

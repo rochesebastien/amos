@@ -202,6 +202,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "projects.fieldModel": "Model override",
     "projects.modelHint": "Leave empty to use the default model from Settings.",
     "projects.modelPlaceholder": "(default)",
+    "project.directory": "Directory",
+    "project.directory.hint": "Absolute path of a local repository to enable Agents mode.",
     "projects.attachedMcps": "Attached MCPs",
     "projects.noMcpsYet": "No MCPs yet — create some in the MCPs tab.",
 
@@ -474,6 +476,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "projects.fieldModel": "Remplacement du modèle",
     "projects.modelHint": "Laissez vide pour utiliser le modèle par défaut défini dans les Paramètres.",
     "projects.modelPlaceholder": "(par défaut)",
+    "project.directory": "Répertoire",
+    "project.directory.hint": "Chemin absolu d'un dépôt local pour activer le mode Agents.",
     "projects.attachedMcps": "MCP associés",
     "projects.noMcpsYet": "Aucun MCP pour l’instant — créez-en dans l’onglet MCPs.",
 

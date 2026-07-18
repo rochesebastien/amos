@@ -16,6 +16,7 @@ const blank: ProjectInput = {
   description: "",
   system_prompt: "",
   model: "",
+  directory: "",
   mcp_ids: [],
 };
 
@@ -25,6 +26,7 @@ function toForm(p: Project): ProjectInput {
     description: p.description,
     system_prompt: p.system_prompt,
     model: p.model,
+    directory: p.directory,
     mcp_ids: p.mcp_ids,
   };
 }
@@ -121,6 +123,13 @@ export function ProjectModal({
             onChange={(e) => setForm({ ...form, system_prompt: e.target.value })}
             placeholder={t("projects.prePromptPlaceholder")}
             rows={4}
+          />
+        </Field>
+        <Field label={t("project.directory")} hint={t("project.directory.hint")}>
+          <Input
+            value={form.directory}
+            onChange={(e) => setForm({ ...form, directory: e.target.value })}
+            placeholder="/home/user/my-repo"
           />
         </Field>
         <Field label={t("projects.fieldModel")} hint={t("projects.modelHint")}>
