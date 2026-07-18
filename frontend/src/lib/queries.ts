@@ -1,8 +1,16 @@
 // TanStack Query client, query keys, and typed hooks for the CheveluAI backend.
-import { QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  QueryClient,
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import {
   api,
+  type AgentDirOverview,
   type MCPInput,
+  type Project,
   type ProjectInput,
   type SettingsUpdate,
 } from "./api";
@@ -60,6 +68,33 @@ export function useAgentDir(projectId: number | null) {
     queryFn: () => api.getAgentDir(projectId as number),
     enabled: projectId != null,
   });
+}
+
+export type AgentDirEntry = {
+  project: Project;
+  overview: AgentDirOverview | undefined;
+  isLoading: boolean;
+};
+
+/**
+ * Fetch every project's agent-dir overview in parallel. Used by the Agents
+ * search palette (and anywhere a cross-project listing is needed). Only fires
+ * for projects that have a linked directory, and only while `enabled`.
+ */
+export function useAgentDirs(projects: Project[], enabled: boolean): AgentDirEntry[] {
+  const linked = projects.filter((p) => p.directory);
+  const results = useQueries({
+    queries: linked.map((p) => ({
+      queryKey: qk.agentDir(p.id),
+      queryFn: () => api.getAgentDir(p.id),
+      enabled,
+    })),
+  });
+  return linked.map((project, i) => ({
+    project,
+    overview: results[i]?.data,
+    isLoading: results[i]?.isLoading ?? false,
+  }));
 }
 
 export function useAgentFile(projectId: number, path: string | null) {

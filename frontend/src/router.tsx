@@ -11,6 +11,7 @@ import { SettingsLayout } from "@/views/settings/SettingsLayout";
 import { ChatView } from "@/views/ChatView";
 import { ProjectsView } from "@/views/ProjectsView";
 import { McpsView } from "@/views/McpsView";
+import { AgentsIndexView, AgentsProjectView } from "@/views/AgentsView";
 import { GeneralSettings } from "@/views/settings/GeneralSettings";
 import { ModelsSettings } from "@/views/settings/ModelsSettings";
 import { StorageSettings } from "@/views/settings/StorageSettings";
@@ -62,6 +63,24 @@ const mcpsRoute = createRoute({
   component: McpsView,
 });
 
+const agentsIndexRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/agents",
+  component: AgentsIndexView,
+});
+
+type AgentsProjectSearch = { file?: string };
+
+const agentsProjectRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/agents/$projectId",
+  validateSearch: (search: Record<string, unknown>): AgentsProjectSearch => {
+    const f = search.file;
+    return typeof f === "string" && f ? { file: f } : {};
+  },
+  component: AgentsProjectView,
+});
+
 // --- Settings: layout route with its own sub-sidebar + nested sections -------
 
 const settingsRoute = createRoute({
@@ -101,6 +120,8 @@ const routeTree = rootRoute.addChildren([
   conversationRoute,
   projectsRoute,
   mcpsRoute,
+  agentsIndexRoute,
+  agentsProjectRoute,
   settingsRoute.addChildren([
     settingsIndexRoute,
     generalSettingsRoute,

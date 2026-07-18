@@ -3,6 +3,8 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   MessagesSquare,
+  Bot,
+  Sparkles,
   FolderKanban,
   Plug,
   Settings as SettingsIcon,
@@ -25,8 +27,13 @@ import {
 import { api, type Conversation, type Project } from "@/lib/api";
 import { useApp } from "@/lib/store";
 import { useT } from "@/lib/i18n";
-import { qk, useConversations, useProjects } from "@/lib/queries";
-import { useSidebar, type ProjectSort, SIDEBAR_RAIL } from "@/lib/sidebar";
+import { qk, useAgentDir, useConversations, useProjects } from "@/lib/queries";
+import {
+  useSidebar,
+  type ProjectSort,
+  type SidebarMode,
+  SIDEBAR_RAIL,
+} from "@/lib/sidebar";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useConfirm } from "@/components/ui/confirm";
 import { ProjectModal } from "@/components/ProjectModal";
@@ -40,6 +47,11 @@ const NAV: { to: string; labelKey: string; icon: React.ElementType }[] = [
   { to: "/", labelKey: "nav.chat", icon: MessagesSquare },
   { to: "/projects", labelKey: "nav.projects", icon: FolderKanban },
   { to: "/mcps", labelKey: "nav.mcps", icon: Plug },
+];
+
+const MODE_TABS: { mode: SidebarMode; labelKey: string; icon: React.ElementType }[] = [
+  { mode: "chats", labelKey: "nav.chat", icon: MessagesSquare },
+  { mode: "agents", labelKey: "nav.agents", icon: Bot },
 ];
 
 const NO_PROJECT = -1;
@@ -70,8 +82,32 @@ export function Sidebar() {
     ? Number(pathname.split("/")[2])
     : null;
 
-  const { width, collapsed, sort, folded, setWidth, setCollapsed, toggle, setSort, toggleFold } =
-    useSidebar();
+  const {
+    width,
+    collapsed,
+    mode,
+    sort,
+    folded,
+    setWidth,
+    setCollapsed,
+    toggle,
+    setMode,
+    setSort,
+    toggleFold,
+  } = useSidebar();
+
+  // Keep the segmented mode in sync with the route so deep links (and reloads)
+  // land on the right tab. Keyed on pathname only — toggling the tab navigates,
+  // and this effect follows the resulting route.
+  useEffect(() => {
+    setMode(pathname.startsWith("/agents") ? "agents" : "chats");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  const switchMode = (m: SidebarMode) => {
+    setMode(m);
+    navigate({ to: m === "agents" ? "/agents" : "/" });
+  };
 
   const { data: conversations = [] } = useConversations();
   const { data: projects = [] } = useProjects();
@@ -269,39 +305,73 @@ export function Sidebar() {
       >
         <img src={logoIcon} alt="CheveluAI" className="mb-1 size-8" />
         <div className="my-1 h-px w-6 bg-sidebar-border" />
-        {NAV.map(({ to, labelKey, icon: Icon }) => (
-          <Fragment key={to}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Link
-                  to={to}
-                  className={cn(
-                    "flex size-9 items-center justify-center rounded-lg transition-colors",
-                    isNavActive(to)
-                      ? "bg-sidebar-accent text-primary"
-                      : "text-muted-foreground hover:bg-sidebar-accent/60",
-                  )}
-                >
-                  <Icon className="size-4" />
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent side="right">{t(labelKey)}</TooltipContent>
-            </Tooltip>
-            {to === "/" && (
+        {/* mode toggle — stacked icon buttons */}
+        {MODE_TABS.map(({ mode: m, labelKey, icon: Icon }) => (
+          <Tooltip key={m}>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => switchMode(m)}
+                className={cn(
+                  "flex size-9 items-center justify-center rounded-lg transition-colors",
+                  mode === m
+                    ? "bg-sidebar-accent text-primary"
+                    : "text-muted-foreground hover:bg-sidebar-accent/60",
+                )}
+              >
+                <Icon className="size-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">{t(labelKey)}</TooltipContent>
+          </Tooltip>
+        ))}
+        <div className="my-1 h-px w-6 bg-sidebar-border" />
+        {mode === "chats" ? (
+          NAV.map(({ to, labelKey, icon: Icon }) => (
+            <Fragment key={to}>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button
-                    onClick={() => setSearchOpen(true)}
-                    className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
+                  <Link
+                    to={to}
+                    className={cn(
+                      "flex size-9 items-center justify-center rounded-lg transition-colors",
+                      isNavActive(to)
+                        ? "bg-sidebar-accent text-primary"
+                        : "text-muted-foreground hover:bg-sidebar-accent/60",
+                    )}
                   >
-                    <Search className="size-4" />
-                  </button>
+                    <Icon className="size-4" />
+                  </Link>
                 </TooltipTrigger>
-                <TooltipContent side="right">{t("nav.search")}</TooltipContent>
+                <TooltipContent side="right">{t(labelKey)}</TooltipContent>
               </Tooltip>
-            )}
-          </Fragment>
-        ))}
+              {to === "/" && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => setSearchOpen(true)}
+                      className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
+                    >
+                      <Search className="size-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">{t("nav.search")}</TooltipContent>
+                </Tooltip>
+              )}
+            </Fragment>
+          ))
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => setSearchOpen(true)}
+                className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
+              >
+                <Search className="size-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">{t("nav.search")}</TooltipContent>
+          </Tooltip>
+        )}
         <div className="flex-1" />
         <Tooltip>
           <TooltipTrigger asChild>
@@ -358,6 +428,46 @@ export function Sidebar() {
         <img src={logoTitleLight} alt="CheveluAI" className="hidden h-12 w-full object-contain px-4 dark:block" />
       </div>
 
+      {/* mode toggle pill */}
+      <div className="px-3 pb-2">
+        <div className="flex rounded-full bg-sidebar-accent/60 p-1">
+          {MODE_TABS.map(({ mode: m, labelKey, icon: Icon }) => {
+            const active = mode === m;
+            return (
+              <button
+                key={m}
+                onClick={() => switchMode(m)}
+                className={cn(
+                  "flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] transition-colors duration-150",
+                  active
+                    ? "border border-border bg-background font-semibold text-foreground dark:bg-card"
+                    : "border border-transparent text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <Icon className="size-4" />
+                {t(labelKey)}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {mode === "agents" ? (
+        <>
+          {/* agents nav — search only */}
+          <nav className="flex flex-col gap-0.5 px-3 py-1.5">
+            <button
+              onClick={() => setSearchOpen(true)}
+              className="flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
+            >
+              <Search className="size-4" />
+              {t("nav.search")}
+            </button>
+          </nav>
+          <AgentsSidebarProjects />
+        </>
+      ) : (
+        <>
       {/* nav */}
       <nav className="flex flex-col gap-0.5 px-3 py-1.5">
         {NAV.map(({ to, labelKey, icon: Icon }) => {
@@ -600,6 +710,8 @@ export function Sidebar() {
           })}
         </div>
       </div>
+        </>
+      )}
 
       {/* foot */}
       <div className="flex items-center gap-1 border-t border-sidebar-border px-3 py-3">
@@ -655,5 +767,119 @@ export function Sidebar() {
 
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
     </aside>
+  );
+}
+
+// ---- Agents mode: projects list with inline expansion ----------------------
+
+function AgentsSidebarProjects() {
+  const t = useT();
+  const { data: projects = [] } = useProjects();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [expanded, setExpanded] = useState<number[]>([]);
+  const toggle = (id: number) =>
+    setExpanded((e) => (e.includes(id) ? e.filter((x) => x !== id) : [...e, id]));
+  const activeId = pathname.startsWith("/agents/") ? Number(pathname.split("/")[2]) : null;
+
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto px-2 pt-2 pb-2">
+      <div className="px-2 pb-1">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+          {t("agents.sidebarProjects")}
+        </span>
+      </div>
+      {projects.length === 0 ? (
+        <p className="px-2 py-2 text-[13px] text-muted-foreground/70">{t("agents.noProjects")}</p>
+      ) : (
+        <div className="flex flex-col gap-0.5">
+          {projects.map((p) => (
+            <AgentsSidebarRow
+              key={p.id}
+              project={p}
+              expanded={expanded.includes(p.id)}
+              active={activeId === p.id}
+              onToggle={() => toggle(p.id)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AgentsSidebarRow({
+  project,
+  expanded,
+  active,
+  onToggle,
+}: {
+  project: Project;
+  expanded: boolean;
+  active: boolean;
+  onToggle: () => void;
+}) {
+  const t = useT();
+  const navigate = useNavigate();
+  const { data: dir } = useAgentDir(expanded ? project.id : null);
+  const items = (dir?.files ?? []).filter((f) => f.kind === "agent" || f.kind === "skill");
+
+  const openProject = () =>
+    navigate({ to: "/agents/$projectId", params: { projectId: String(project.id) } });
+  const openFile = (path: string) =>
+    navigate({
+      to: "/agents/$projectId",
+      params: { projectId: String(project.id) },
+      search: { file: path },
+    });
+
+  return (
+    <div className="flex flex-col">
+      <div
+        className={cn(
+          "flex items-center gap-1 rounded-md px-1.5 py-1 text-[13px] transition-colors",
+          active
+            ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
+            : "text-muted-foreground hover:bg-sidebar-accent/60",
+        )}
+      >
+        <button onClick={onToggle} className="flex shrink-0 items-center">
+          <ChevronRight className={cn("size-3.5 transition-transform", expanded && "rotate-90")} />
+        </button>
+        <Folder className={cn("size-3.5 shrink-0", active && "text-primary")} />
+        <button onClick={openProject} className="min-w-0 flex-1 truncate text-left font-medium">
+          {project.name}
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="flex flex-col gap-0.5 pb-1">
+          {!project.directory ? (
+            <p className="py-1 pl-7 text-[12px] text-muted-foreground/50">
+              {t("agents.noLinkedDir")}
+            </p>
+          ) : items.length === 0 ? (
+            <p className="py-1 pl-7 text-[12px] text-muted-foreground/50">{t("agents.noItems")}</p>
+          ) : (
+            items.map((f) => (
+              <button
+                key={f.path}
+                onClick={() => openFile(f.path)}
+                className="flex items-center gap-1.5 rounded-md py-1 pl-7 pr-2 text-left text-[12px] text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
+              >
+                {f.kind === "agent" ? (
+                  <Bot className="size-3.5 shrink-0" />
+                ) : (
+                  <Sparkles className="size-3.5 shrink-0" />
+                )}
+                <span className="min-w-0 flex-1 truncate">{f.name}</span>
+                <span className="shrink-0 text-[10px] lowercase text-muted-foreground/50">
+                  {f.provider}
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
   );
 }

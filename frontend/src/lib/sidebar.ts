@@ -1,9 +1,11 @@
 import { create } from "zustand";
 
 export type ProjectSort = "recent" | "name";
+export type SidebarMode = "chats" | "agents";
 
 const WIDTH_KEY = "cheveluai.sidebar.width";
 const COLLAPSED_KEY = "cheveluai.sidebar.collapsed";
+const MODE_KEY = "cheveluai.sidebar.mode";
 const SORT_KEY = "cheveluai.projects.sort";
 const FOLDED_KEY = "cheveluai.projects.folded";
 
@@ -15,11 +17,13 @@ export const SIDEBAR_DEFAULT = 280;
 type SidebarState = {
   width: number;
   collapsed: boolean;
+  mode: SidebarMode;
   sort: ProjectSort;
   folded: number[];
   setWidth: (w: number) => void;
   setCollapsed: (c: boolean) => void;
   toggle: () => void;
+  setMode: (m: SidebarMode) => void;
   setSort: (s: ProjectSort) => void;
   toggleFold: (id: number) => void;
 };
@@ -30,6 +34,7 @@ function clampWidth(w: number) {
 
 const storedWidth = Number(localStorage.getItem(WIDTH_KEY));
 const storedSort = (localStorage.getItem(SORT_KEY) as ProjectSort) || "recent";
+const storedMode = (localStorage.getItem(MODE_KEY) as SidebarMode) || "chats";
 
 function loadFolded(): number[] {
   try {
@@ -43,6 +48,7 @@ function loadFolded(): number[] {
 export const useSidebar = create<SidebarState>((set) => ({
   width: storedWidth ? clampWidth(storedWidth) : SIDEBAR_DEFAULT,
   collapsed: localStorage.getItem(COLLAPSED_KEY) === "1",
+  mode: storedMode,
   sort: storedSort,
   folded: loadFolded(),
   setWidth: (w) => {
@@ -60,6 +66,10 @@ export const useSidebar = create<SidebarState>((set) => ({
       localStorage.setItem(COLLAPSED_KEY, next ? "1" : "0");
       return { collapsed: next };
     }),
+  setMode: (m) => {
+    localStorage.setItem(MODE_KEY, m);
+    set({ mode: m });
+  },
   setSort: (s) => {
     localStorage.setItem(SORT_KEY, s);
     set({ sort: s });

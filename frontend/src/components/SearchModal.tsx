@@ -1,20 +1,27 @@
 import * as React from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Search } from "lucide-react";
+import { Search, Bot, Sparkles } from "lucide-react";
 import type { Conversation, Project } from "@/lib/api";
-import { useConversations, useProjects } from "@/lib/queries";
+import { useAgentDirs, useConversations, useProjects } from "@/lib/queries";
+import { useSidebar } from "@/lib/sidebar";
 import { useT, useLang, type Lang } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-// Command-palette style search popup. Structured so a later "Agents" mode can
-// reuse the same shell: the shell (overlay, input, keyboard nav) is generic and
-// the results list is an isolated inner component fed a flat list of rows.
+// Command-palette style search popup. The shell (overlay, input, keyboard nav)
+// is generic; the result rows are swapped by the current sidebar mode — chats
+// search conversations, agents search agent & skill names across all projects.
 
 type ResultRow = {
-  id: number;
+  key: string;
   title: string;
   right: string; // project name (or "no project" label)
-  date: string; // formatted first-message date
+  date?: string; // chats: formatted first-message date
+  kind?: "agent" | "skill"; // agents: item kind
+  provider?: string; // agents: claude / codex
+  // navigation target
+  conversationId?: number;
+  projectId?: number;
+  filePath?: string;
 };
 
 function localeFor(lang: Lang): string {
@@ -49,28 +56,60 @@ function useConversationRows(query: string): ResultRow[] {
       }
       const date = new Date(c.created_at);
       rows.push({
-        id: c.id,
+        key: `c:${c.id}`,
         title: c.title,
         right: rightLabel,
         date: Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString(locale),
+        conversationId: c.id,
       });
     }
     return rows;
   }, [conversations, projects, query, lang, t]);
 }
 
-function ConversationResults({
+/** Build filtered agent/skill rows across every project with a linked directory. */
+function useAgentRows(query: string, enabled: boolean): ResultRow[] {
+  const { data: projects = [] } = useProjects();
+  const entries = useAgentDirs(projects, enabled);
+
+  return React.useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const rows: ResultRow[] = [];
+    for (const { project, overview } of entries) {
+      if (!overview?.exists) continue;
+      for (const f of overview.files) {
+        if (f.kind !== "agent" && f.kind !== "skill") continue;
+        if (q && !`${f.name} ${project.name}`.toLowerCase().includes(q)) continue;
+        rows.push({
+          key: `${project.id}:${f.path}`,
+          title: f.name,
+          right: project.name,
+          kind: f.kind,
+          provider: f.provider,
+          projectId: project.id,
+          filePath: f.path,
+        });
+      }
+    }
+    return rows;
+    // entries changes identity each render; recompute is cheap for this list.
+  }, [entries, query]);
+}
+
+function Results({
   rows,
   total,
+  emptyText,
   activeIndex,
   onHover,
   onSelect,
 }: {
   rows: ResultRow[];
   total: number;
+  emptyText: string;
   activeIndex: number;
   onHover: (index: number) => void;
-  onSelect: (id: number) => void;
+  onSelect: (row: ResultRow) => void;
 }) {
   const t = useT();
   const activeRef = React.useRef<HTMLButtonElement | null>(null);
@@ -81,9 +120,7 @@ function ConversationResults({
 
   if (total === 0) {
     return (
-      <p className="px-4 py-8 text-center text-[13px] text-muted-foreground/70">
-        {t("threads.none")}
-      </p>
+      <p className="px-4 py-8 text-center text-[13px] text-muted-foreground/70">{emptyText}</p>
     );
   }
   if (rows.length === 0) {
@@ -100,17 +137,31 @@ function ConversationResults({
         const active = i === activeIndex;
         return (
           <button
-            key={row.id}
+            key={row.key}
             ref={active ? activeRef : undefined}
-            onClick={() => onSelect(row.id)}
+            onClick={() => onSelect(row)}
             onMouseMove={() => onHover(i)}
             className={cn(
               "flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors",
               active ? "bg-accent" : "hover:bg-accent",
             )}
           >
+            {row.kind &&
+              (row.kind === "agent" ? (
+                <Bot className="size-4 shrink-0 text-muted-foreground" />
+              ) : (
+                <Sparkles className="size-4 shrink-0 text-muted-foreground" />
+              ))}
             <span className="min-w-0 flex-1 truncate text-foreground">{row.title}</span>
             <span className="flex shrink-0 items-center gap-2 text-[12px] text-muted-foreground">
+              {row.kind && (
+                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground/80">
+                  {row.kind}
+                </span>
+              )}
+              {row.provider && (
+                <span className="text-[10px] lowercase text-muted-foreground/60">{row.provider}</span>
+              )}
               <span className="max-w-[10rem] truncate">{row.right}</span>
               {row.date && <span className="tabular-nums text-muted-foreground/70">{row.date}</span>}
             </span>
@@ -124,13 +175,19 @@ function ConversationResults({
 export function SearchModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const t = useT();
   const navigate = useNavigate();
+  const mode = useSidebar((s) => s.mode);
   const inputRef = React.useRef<HTMLInputElement | null>(null);
   const [query, setQuery] = React.useState("");
   const [activeIndex, setActiveIndex] = React.useState(0);
 
-  const rows = useConversationRows(query);
+  const isAgents = mode === "agents";
+  const conversationRows = useConversationRows(query);
+  const agentRows = useAgentRows(query, open && isAgents);
+  const rows = isAgents ? agentRows : conversationRows;
+
   const { data: conversations = [] } = useConversations();
-  const total = conversations.length;
+  const unfilteredAgents = useAgentRows("", open && isAgents);
+  const total = isAgents ? unfilteredAgents.length : conversations.length;
 
   // reset + focus on open
   React.useEffect(() => {
@@ -146,9 +203,17 @@ export function SearchModal({ open, onClose }: { open: boolean; onClose: () => v
     setActiveIndex((i) => (rows.length === 0 ? 0 : Math.min(i, rows.length - 1)));
   }, [rows.length]);
 
-  const select = (id: number) => {
+  const select = (row: ResultRow) => {
     onClose();
-    navigate({ to: "/c/$conversationId", params: { conversationId: String(id) } });
+    if (row.conversationId != null) {
+      navigate({ to: "/c/$conversationId", params: { conversationId: String(row.conversationId) } });
+    } else if (row.projectId != null && row.filePath) {
+      navigate({
+        to: "/agents/$projectId",
+        params: { projectId: String(row.projectId) },
+        search: { file: row.filePath },
+      });
+    }
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -164,7 +229,7 @@ export function SearchModal({ open, onClose }: { open: boolean; onClose: () => v
     } else if (e.key === "Enter") {
       e.preventDefault();
       const row = rows[activeIndex];
-      if (row) select(row.id);
+      if (row) select(row);
     }
   };
 
@@ -185,16 +250,17 @@ export function SearchModal({ open, onClose }: { open: boolean; onClose: () => v
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={t("search.placeholder")}
+            placeholder={isAgents ? t("search.agentsPlaceholder") : t("search.placeholder")}
             className="h-12 w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
           />
         </div>
 
         {/* results */}
         <div className="max-h-[60vh] min-h-0 overflow-y-auto">
-          <ConversationResults
+          <Results
             rows={rows}
             total={total}
+            emptyText={isAgents ? t("search.noResults") : t("threads.none")}
             activeIndex={activeIndex}
             onHover={setActiveIndex}
             onSelect={select}
