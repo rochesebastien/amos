@@ -53,6 +53,7 @@ import {
   AttachmentMedia,
   AttachmentTitle,
 } from "@/components/ui/attachment";
+import { ChatMinimap } from "@/components/ChatMinimap";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 import logoIcon from "@/assets/logo.png";
@@ -295,6 +296,9 @@ export function ChatView() {
     ),
   );
   const empty = messages.length === 0;
+  const minimapItems = messages
+    .map((m, i) => (m.role === "user" ? { index: i, content: m.content } : null))
+    .filter((x): x is { index: number; content: string } => x !== null);
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
@@ -341,6 +345,7 @@ export function ChatView() {
                 ))}
               </MessageScrollerContent>
             </MessageScrollerViewport>
+            <ChatMinimap items={minimapItems} />
             <MessageScrollerButton />
           </MessageScroller>
         </MessageScrollerProvider>
