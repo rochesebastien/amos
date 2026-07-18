@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -20,6 +20,7 @@ import {
   ArrowDownUp,
   Check,
   Pencil,
+  Search,
 } from "lucide-react";
 import { api, type Conversation, type Project } from "@/lib/api";
 import { useApp } from "@/lib/store";
@@ -29,6 +30,7 @@ import { useSidebar, type ProjectSort, SIDEBAR_RAIL } from "@/lib/sidebar";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useConfirm } from "@/components/ui/confirm";
 import { ProjectModal } from "@/components/ProjectModal";
+import { SearchModal } from "@/components/SearchModal";
 import { cn } from "@/lib/utils";
 import logoIcon from "@/assets/logo.png";
 import logoTitleBlack from "@/assets/logo_title_black.png";
@@ -76,6 +78,19 @@ export function Sidebar() {
   const confirm = useConfirm();
   const [sortOpen, setSortOpen] = useState(false);
   const [editProject, setEditProject] = useState<Project | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  // Cmd/Ctrl+K opens the search palette.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // inline editing
   const [editConvId, setEditConvId] = useState<number | null>(null);
@@ -255,22 +270,37 @@ export function Sidebar() {
         <img src={logoIcon} alt="CheveluAI" className="mb-1 size-8" />
         <div className="my-1 h-px w-6 bg-sidebar-border" />
         {NAV.map(({ to, labelKey, icon: Icon }) => (
-          <Tooltip key={to}>
-            <TooltipTrigger asChild>
-              <Link
-                to={to}
-                className={cn(
-                  "flex size-9 items-center justify-center rounded-lg transition-colors",
-                  isNavActive(to)
-                    ? "bg-sidebar-accent text-primary"
-                    : "text-muted-foreground hover:bg-sidebar-accent/60",
-                )}
-              >
-                <Icon className="size-4" />
-              </Link>
-            </TooltipTrigger>
-            <TooltipContent side="right">{t(labelKey)}</TooltipContent>
-          </Tooltip>
+          <Fragment key={to}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link
+                  to={to}
+                  className={cn(
+                    "flex size-9 items-center justify-center rounded-lg transition-colors",
+                    isNavActive(to)
+                      ? "bg-sidebar-accent text-primary"
+                      : "text-muted-foreground hover:bg-sidebar-accent/60",
+                  )}
+                >
+                  <Icon className="size-4" />
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent side="right">{t(labelKey)}</TooltipContent>
+            </Tooltip>
+            {to === "/" && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setSearchOpen(true)}
+                    className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
+                  >
+                    <Search className="size-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right">{t("nav.search")}</TooltipContent>
+              </Tooltip>
+            )}
+          </Fragment>
         ))}
         <div className="flex-1" />
         <Tooltip>
@@ -311,6 +341,7 @@ export function Sidebar() {
           </TooltipTrigger>
           <TooltipContent side="right">{t("nav.expandSidebar")}</TooltipContent>
         </Tooltip>
+        <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
       </aside>
     );
   }
@@ -332,19 +363,29 @@ export function Sidebar() {
         {NAV.map(({ to, labelKey, icon: Icon }) => {
           const active = isNavActive(to);
           return (
-            <Link
-              key={to}
-              to={to}
-              className={cn(
-                "flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors",
-                active
-                  ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
-                  : "text-muted-foreground hover:bg-sidebar-accent/60",
+            <Fragment key={to}>
+              <Link
+                to={to}
+                className={cn(
+                  "flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors",
+                  active
+                    ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
+                    : "text-muted-foreground hover:bg-sidebar-accent/60",
+                )}
+              >
+                <Icon className={cn("size-4", active && "text-primary")} />
+                {t(labelKey)}
+              </Link>
+              {to === "/" && (
+                <button
+                  onClick={() => setSearchOpen(true)}
+                  className="flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
+                >
+                  <Search className="size-4" />
+                  {t("nav.search")}
+                </button>
               )}
-            >
-              <Icon className={cn("size-4", active && "text-primary")} />
-              {t(labelKey)}
-            </Link>
+            </Fragment>
           );
         })}
       </nav>
@@ -611,6 +652,8 @@ export function Sidebar() {
         onClose={() => setEditProject(null)}
         project={editProject}
       />
+
+      <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
     </aside>
   );
 }

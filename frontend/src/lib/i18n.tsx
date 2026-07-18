@@ -30,12 +30,17 @@ const dict: Record<Lang, Record<string, string>> = {
 
     // nav
     "nav.chat": "Chat",
+    "nav.search": "Search",
     "nav.projects": "Projects",
     "nav.mcps": "MCPs",
     "nav.settings": "Settings",
     "nav.toggleTheme": "Toggle theme",
     "nav.expandSidebar": "Expand sidebar",
     "nav.collapseSidebar": "Collapse sidebar",
+
+    // search
+    "search.placeholder": "Search chats…",
+    "search.noResults": "No results",
 
     // sidebar / threads
     "threads.title": "Threads",
@@ -311,12 +316,17 @@ const dict: Record<Lang, Record<string, string>> = {
     "common.loading": "Chargement…",
 
     "nav.chat": "Discussion",
+    "nav.search": "Recherche",
     "nav.projects": "Projets",
     "nav.mcps": "MCPs",
     "nav.settings": "Paramètres",
     "nav.toggleTheme": "Changer de thème",
     "nav.expandSidebar": "Déplier le panneau",
     "nav.collapseSidebar": "Replier le panneau",
+
+    // search
+    "search.placeholder": "Rechercher des chats…",
+    "search.noResults": "Aucun résultat",
 
     "threads.title": "Conversations",
     "threads.sortProjects": "Trier les projets",
