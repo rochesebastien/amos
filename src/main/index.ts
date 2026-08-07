@@ -1,8 +1,9 @@
-import { app, BrowserWindow, shell } from "electron";
+import { app, BrowserWindow, session } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { closeDatabase, initDatabase } from "./db/index.js";
 import { disposeIpcHandlers, registerIpcHandlers } from "./ipc.js";
+import { applyContentSecurityPolicy, hardenNavigation } from "./security.js";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -26,6 +27,11 @@ function createWindow(): BrowserWindow {
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
+      nodeIntegrationInWorker: false,
+      nodeIntegrationInSubFrames: false,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+      experimentalFeatures: false,
       webviewTag: false,
     },
   });
@@ -33,10 +39,7 @@ function createWindow(): BrowserWindow {
   win.once("ready-to-show", () => win.show());
 
   // Never let the app frame navigate away; external links open in the OS browser.
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url);
-    return { action: "deny" };
-  });
+  hardenNavigation(win.webContents, rendererDevUrl);
 
   if (rendererDevUrl) {
     void win.loadURL(rendererDevUrl);
@@ -65,6 +68,8 @@ if (!app.requestSingleInstanceLock()) {
     // shares its database with an installed release.
     initDatabase(path.join(app.getPath("userData"), "amos.db"));
     registerIpcHandlers();
+    // Must be installed before the first document load.
+    applyContentSecurityPolicy(session.defaultSession, rendererDevUrl);
     mainWindow = createWindow();
     mainWindow.on("closed", () => {
       mainWindow = null;
