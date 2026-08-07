@@ -1,13 +1,12 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { ArrowLeft, SlidersHorizontal, Boxes, Database } from "lucide-react";
+import { ArrowLeft, SlidersHorizontal } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import logoIcon from "@/assets/logo.png";
 
+// The Backends section joins this list once the chat drivers land.
 const SECTIONS = [
   { to: "/settings/general", labelKey: "settings.general", icon: SlidersHorizontal },
-  { to: "/settings/models", labelKey: "settings.models", icon: Boxes },
-  { to: "/settings/storage", labelKey: "settings.storage", icon: Database },
 ] as const;
 
 export function SettingsLayout() {
@@ -29,7 +28,7 @@ export function SettingsLayout() {
         </div>
 
         <div className="flex items-center gap-2 px-6 pb-3 pt-1">
-          <img src={logoIcon} alt="CheveluAI" className="size-7" />
+          <img src={logoIcon} alt="AMOS" className="size-7" />
           <h2 className="text-lg font-display">{t("settings.title")}</h2>
         </div>
 

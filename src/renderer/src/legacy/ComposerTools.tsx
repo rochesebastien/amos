@@ -1,3 +1,4 @@
+// PARKED — composer menus of the CheveluAI chat view. See ChatView.tsx.
 import { useState } from "react";
 import {
   Plus,

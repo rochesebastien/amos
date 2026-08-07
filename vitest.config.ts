@@ -14,7 +14,5 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/**/*.test.ts", "src/**/*.test.ts"],
-    // The suites arrive with the scanner in P2; until then an empty run is a pass.
-    passWithNoTests: true,
   },
 });

@@ -9,12 +9,9 @@ import {
 } from "@tanstack/react-router";
 import { Sidebar } from "@/components/Sidebar";
 import { SettingsLayout } from "@/views/settings/SettingsLayout";
-import { ChatView } from "@/views/ChatView";
-import { ProjectsView } from "@/views/ProjectsView";
-import { McpsView } from "@/views/McpsView";
+import { WelcomeView } from "@/views/WelcomeView";
+import { ProjectView } from "@/views/ProjectView";
 import { GeneralSettings } from "@/views/settings/GeneralSettings";
-import { ModelsSettings } from "@/views/settings/ModelsSettings";
-import { StorageSettings } from "@/views/settings/StorageSettings";
 
 function RootShell() {
   // On /settings the dedicated settings sidebar replaces the main app sidebar.
@@ -33,34 +30,18 @@ function RootShell() {
 
 const rootRoute = createRootRoute({ component: RootShell });
 
-type ChatSearch = { project?: number };
-
-const chatIndexRoute = createRoute({
+/** Home: welcome screen + recent projects. */
+const welcomeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
-  validateSearch: (search: Record<string, unknown>): ChatSearch => {
-    const p = Number(search.project);
-    return Number.isFinite(p) && p > 0 ? { project: p } : {};
-  },
-  component: ChatView,
+  component: WelcomeView,
 });
 
-const conversationRoute = createRoute({
+/** Project overview. Chat and item routes hang off this one in later phases. */
+const projectRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/c/$conversationId",
-  component: ChatView,
-});
-
-const projectsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/projects",
-  component: ProjectsView,
-});
-
-const mcpsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/mcps",
-  component: McpsView,
+  path: "/p/$projectId",
+  component: ProjectView,
 });
 
 // --- Settings: layout route with its own sub-sidebar + nested sections -------
@@ -85,29 +66,10 @@ const generalSettingsRoute = createRoute({
   component: GeneralSettings,
 });
 
-const modelsSettingsRoute = createRoute({
-  getParentRoute: () => settingsRoute,
-  path: "models",
-  component: ModelsSettings,
-});
-
-const storageSettingsRoute = createRoute({
-  getParentRoute: () => settingsRoute,
-  path: "storage",
-  component: StorageSettings,
-});
-
 const routeTree = rootRoute.addChildren([
-  chatIndexRoute,
-  conversationRoute,
-  projectsRoute,
-  mcpsRoute,
-  settingsRoute.addChildren([
-    settingsIndexRoute,
-    generalSettingsRoute,
-    modelsSettingsRoute,
-    storageSettingsRoute,
-  ]),
+  welcomeRoute,
+  projectRoute,
+  settingsRoute.addChildren([settingsIndexRoute, generalSettingsRoute]),
 ]);
 
 // Hash history: the packaged app is served from `file://`, where path-based

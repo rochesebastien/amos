@@ -1,11 +1,6 @@
-// TanStack Query client, query keys, and typed hooks for the CheveluAI backend.
+// TanStack Query client, query keys, and typed hooks over the IPC bridge.
 import { QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  api,
-  type MCPInput,
-  type ProjectInput,
-  type SettingsUpdate,
-} from "./api";
+import { ipc } from "./ipc";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -18,37 +13,20 @@ export const queryClient = new QueryClient({
 });
 
 export const qk = {
-  settings: ["settings"] as const,
-  models: ["models"] as const,
   projects: ["projects"] as const,
-  mcps: ["mcps"] as const,
-  conversations: ["conversations"] as const,
-  conversation: (id: number) => ["conversation", id] as const,
+  setting: (key: string) => ["setting", key] as const,
 };
 
 // ----- Queries --------------------------------------------------------------
 
-export function useSettings() {
-  return useQuery({ queryKey: qk.settings, queryFn: api.getSettings });
-}
-
 export function useProjects() {
-  return useQuery({ queryKey: qk.projects, queryFn: api.listProjects });
+  return useQuery({ queryKey: qk.projects, queryFn: ipc.listProjects });
 }
 
-export function useMcps() {
-  return useQuery({ queryKey: qk.mcps, queryFn: api.listMcps });
-}
-
-export function useConversations() {
-  return useQuery({ queryKey: qk.conversations, queryFn: api.listConversations });
-}
-
-export function useConversation(id: number | null) {
+export function useSetting(key: string) {
   return useQuery({
-    queryKey: id != null ? qk.conversation(id) : ["conversation", "none"],
-    queryFn: () => api.getConversation(id as number),
-    enabled: id != null,
+    queryKey: qk.setting(key),
+    queryFn: () => ipc.getSetting(key),
   });
 }
 
@@ -56,51 +34,28 @@ export function useConversation(id: number | null) {
 
 export function useProjectMutations() {
   const qc = useQueryClient();
-  const invalidate = () => {
-    qc.invalidateQueries({ queryKey: qk.projects });
-    qc.invalidateQueries({ queryKey: qk.conversations });
-  };
+  const invalidate = () => qc.invalidateQueries({ queryKey: qk.projects });
   return {
-    create: useMutation({
-      mutationFn: (body: ProjectInput) => api.createProject(body),
-      onSuccess: invalidate,
-    }),
-    update: useMutation({
-      mutationFn: ({ id, body }: { id: number; body: ProjectInput }) =>
-        api.updateProject(id, body),
+    /** Register a folder (or re-open a known one) and return the project. */
+    add: useMutation({
+      mutationFn: (path: string) => ipc.addProject(path),
       onSuccess: invalidate,
     }),
     remove: useMutation({
-      mutationFn: (id: number) => api.deleteProject(id),
+      mutationFn: (id: string) => ipc.removeProject(id),
+      onSuccess: invalidate,
+    }),
+    touch: useMutation({
+      mutationFn: (id: string) => ipc.touchProject(id),
       onSuccess: invalidate,
     }),
   };
 }
 
-export function useMcpMutations() {
-  const qc = useQueryClient();
-  const invalidate = () => qc.invalidateQueries({ queryKey: qk.mcps });
-  return {
-    create: useMutation({
-      mutationFn: (body: MCPInput) => api.createMcp(body),
-      onSuccess: invalidate,
-    }),
-    update: useMutation({
-      mutationFn: ({ id, body }: { id: number; body: MCPInput }) =>
-        api.updateMcp(id, body),
-      onSuccess: invalidate,
-    }),
-    remove: useMutation({
-      mutationFn: (id: number) => api.deleteMcp(id),
-      onSuccess: invalidate,
-    }),
-  };
-}
-
-export function useSettingsMutation() {
+export function useSettingMutation() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: SettingsUpdate) => api.updateSettings(body),
-    onSuccess: (data) => qc.setQueryData(qk.settings, data),
+    mutationFn: ({ key, value }: { key: string; value: string }) => ipc.setSetting(key, value),
+    onSuccess: (data) => qc.setQueryData(qk.setting(data.key), data),
   });
 }

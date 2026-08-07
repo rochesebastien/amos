@@ -2,16 +2,18 @@
   "name": "amos",
   "private": true,
   "version": "0.1.0",
-  "description": "AMOS — Agentic Management and Orchestrator Software",
+  "description": "AMOS \u2014 Agentic Management and Orchestrator Software",
   "type": "module",
   "main": "out/main/index.js",
   "scripts": {
-    "dev": "electron-vite dev",
-    "build": "npm run typecheck && electron-vite build",
+    "dev": "npm run rebuild:electron && electron-vite dev",
+    "build": "npm run typecheck && npm run rebuild:electron && electron-vite build",
     "preview": "electron-vite preview",
     "typecheck": "tsc -b --force tsconfig.node.json tsconfig.web.json",
-    "test": "vitest run",
-    "postinstall": "electron-builder install-app-deps"
+    "test": "npm run rebuild:node && vitest run",
+    "rebuild:node": "node scripts/native-deps.mjs node",
+    "rebuild:electron": "node scripts/native-deps.mjs electron",
+    "postinstall": "node scripts/native-deps.mjs electron"
   },
   "dependencies": {
     "@radix-ui/react-dropdown-menu": "^2.1.18",
@@ -21,16 +23,19 @@
     "@shadcn/react": "^0.1.0",
     "@tanstack/react-query": "^5.101.1",
     "@tanstack/react-router": "^1.170.16",
+    "better-sqlite3": "^12.11.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.469.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tailwind-merge": "^2.6.0",
+    "zod": "^4.4.3",
     "zustand": "^5.0.2"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^22.10.0",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",

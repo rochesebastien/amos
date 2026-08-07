@@ -16,12 +16,12 @@ type SidebarState = {
   width: number;
   collapsed: boolean;
   sort: ProjectSort;
-  folded: number[];
+  folded: string[];
   setWidth: (w: number) => void;
   setCollapsed: (c: boolean) => void;
   toggle: () => void;
   setSort: (s: ProjectSort) => void;
-  toggleFold: (id: number) => void;
+  toggleFold: (id: string) => void;
 };
 
 function clampWidth(w: number) {
@@ -31,10 +31,10 @@ function clampWidth(w: number) {
 const storedWidth = Number(localStorage.getItem(WIDTH_KEY));
 const storedSort = (localStorage.getItem(SORT_KEY) as ProjectSort) || "recent";
 
-function loadFolded(): number[] {
+function loadFolded(): string[] {
   try {
-    const v = JSON.parse(localStorage.getItem(FOLDED_KEY) || "[]");
-    return Array.isArray(v) ? v.filter((x) => typeof x === "number") : [];
+    const v: unknown = JSON.parse(localStorage.getItem(FOLDED_KEY) || "[]");
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
   } catch {
     return [];
   }

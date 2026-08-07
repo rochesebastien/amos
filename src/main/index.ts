@@ -1,7 +1,8 @@
-import { app, BrowserWindow, ipcMain, shell } from "electron";
+import { app, BrowserWindow, shell } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { PingResult } from "../shared/ipc.js";
+import { closeDatabase, initDatabase } from "./db/index.js";
+import { registerIpcHandlers } from "./ipc.js";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -46,12 +47,6 @@ function createWindow(): BrowserWindow {
   return win;
 }
 
-function registerIpcHandlers(): void {
-  ipcMain.handle("app:ping", (): PingResult => {
-    return { pong: true, version: app.getVersion(), platform: process.platform };
-  });
-}
-
 // A second launch focuses the existing window instead of opening a new one.
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -66,6 +61,9 @@ if (!app.requestSingleInstanceLock()) {
     if (isDev) app.setAppUserModelId("com.amos.app.dev");
     else app.setAppUserModelId("com.amos.app");
 
+    // `userData` is per-app and per-build-channel, so the dev app never
+    // shares its database with an installed release.
+    initDatabase(path.join(app.getPath("userData"), "amos.db"));
     registerIpcHandlers();
     mainWindow = createWindow();
     mainWindow.on("closed", () => {
@@ -85,4 +83,6 @@ if (!app.requestSingleInstanceLock()) {
   app.on("window-all-closed", () => {
     if (process.platform !== "darwin") app.quit();
   });
+
+  app.on("will-quit", () => closeDatabase());
 }

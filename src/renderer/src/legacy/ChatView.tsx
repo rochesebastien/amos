@@ -1,3 +1,7 @@
+// PARKED — CheveluAI chat view, kept verbatim for the chat phase, where the
+// event reducer below is refitted onto the IPC transport (SSE -> push events).
+// It still imports the deleted HTTP client, so it is excluded from typecheck
+// (see tsconfig.web.json) and is not routed.
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
@@ -15,7 +19,7 @@ import {
 import { streamChat, type Message, type ChatEvent } from "@/lib/api";
 import { qk, useConversation, useProjects, useMcps, useSettings } from "@/lib/queries";
 import { Markdown } from "@/components/Markdown";
-import { ComposerAddMenu, ProjectChip, ToolsChip } from "@/components/ComposerTools";
+import { ComposerAddMenu, ProjectChip, ToolsChip } from "./ComposerTools";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import {

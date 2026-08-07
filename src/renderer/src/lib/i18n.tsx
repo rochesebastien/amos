@@ -1,8 +1,9 @@
 // Lightweight i18n: a Zustand-backed language store + a `useT()` hook.
 // No external dependency. Translations are flat dot-namespaced keys with
 // optional `{var}` interpolation. Missing keys fall back to the key itself.
+// Every user-facing string must exist in BOTH dictionaries.
 import { create } from "zustand";
-import { api } from "./api";
+import { ipc } from "./ipc";
 
 export type Lang = "en" | "fr";
 
@@ -13,6 +14,9 @@ export const LANGUAGES: { value: Lang; label: string }[] = [
 
 const LANG_KEY = "cheveluai.lang";
 
+/** Key of the persisted (main-process) language preference. */
+export const LANG_SETTING = "language";
+
 const dict: Record<Lang, Record<string, string>> = {
   en: {
     // common
@@ -21,6 +25,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "common.saved": "Saved",
     "common.cancel": "Cancel",
     "common.delete": "Delete",
+    "common.remove": "Remove",
     "common.rename": "Rename",
     "common.move": "Move",
     "common.back": "Back",
@@ -29,42 +34,60 @@ const dict: Record<Lang, Record<string, string>> = {
     "common.loading": "Loading…",
 
     // nav
-    "nav.chat": "Chat",
-    "nav.projects": "Projects",
-    "nav.mcps": "MCPs",
+    "nav.home": "Home",
     "nav.settings": "Settings",
     "nav.toggleTheme": "Toggle theme",
     "nav.expandSidebar": "Expand sidebar",
     "nav.collapseSidebar": "Collapse sidebar",
+    "nav.resizeHint": "Drag to resize · double-click to collapse",
 
-    // sidebar / threads
-    "threads.title": "Threads",
-    "threads.sortProjects": "Sort projects",
-    "threads.mostRecent": "Most recent",
-    "threads.nameAsc": "Name (A–Z)",
-    "threads.none": "No conversations yet.",
-    "threads.noConversations": "No conversations",
-    "threads.dropHere": "Drop here",
-    "threads.noProject": "No project",
-    "threads.newChatIn": "New chat in {name}",
-    "threads.edit": "Edit {name}",
-    "threads.doubleClickRename": "Double-click to rename",
+    // sidebar
+    "sidebar.projects": "Projects",
+    "sidebar.none": "No project yet",
+    "sidebar.openFolder": "Open a folder",
+    "sidebar.sort": "Sort projects",
+    "sidebar.sortRecent": "Most recent",
+    "sidebar.sortName": "Name (A–Z)",
 
-    // confirms
-    "confirm.deleteConv.title": "Delete conversation",
-    "confirm.deleteConv.desc": "“{title}” will be permanently deleted.",
-    "confirm.renameConv.title": "Rename conversation",
-    "confirm.renameConv.desc": "Rename “{from}” to “{to}”?",
-    "confirm.renameProj.title": "Rename project",
-    "confirm.renameProj.desc": "Rename “{from}” to “{to}”?",
-    "confirm.moveConv.title": "Move conversation",
-    "confirm.moveConv.desc": "Move “{title}” to “{target}”?",
+    // welcome / recents
+    "welcome.title": "Welcome to AMOS",
+    "welcome.subtitle":
+      "Open a project folder to manage its agents, skills and MCP servers — for Claude and Codex alike.",
+    "welcome.openFolder": "Open folder",
+    "welcome.opening": "Opening…",
+    "welcome.recents": "Recent projects",
+    "welcome.noRecents": "No project yet — open a folder to get started.",
+    "welcome.openFailed": "Could not open this folder: {error}",
+
+    // projects
+    "projects.never": "Never opened",
+    "projects.lastOpened": "Opened {when}",
+    "projects.remove": "Remove from AMOS",
+    "projects.removeTitle": "Remove project",
+    "projects.removeDesc":
+      "“{name}” will be removed from AMOS. The folder on disk is left untouched.",
+
+    // project overview
+    "project.overview": "Overview",
+    "project.folder": "Folder",
+    "project.notFound": "Unknown project",
+    "project.notFoundDesc": "This project is not registered in AMOS (any more).",
+    "project.backHome": "Back to home",
+    "project.agents": "Agents",
+    "project.skills": "Skills",
+    "project.mcps": "MCP servers",
+    "project.scanSoon": "Scanning this folder arrives in the next iteration.",
+
+    // relative time
+    "time.now": "just now",
+    "time.minutes": "{n} min ago",
+    "time.hours": "{n} h ago",
+    "time.days": "{n} d ago",
+    "time.weeks": "{n} wk ago",
 
     // settings shell
     "settings.title": "Settings",
     "settings.general": "General",
-    "settings.models": "Models",
-    "settings.storage": "Storage",
     "settings.backToApp": "Back to app",
 
     // settings · general
@@ -77,62 +100,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "settings.language": "Language",
     "settings.language.hint": "Interface language. Applies immediately.",
 
-    // settings · models
-    "settings.models.title": "Models",
-    "settings.models.subtitle": "Connect a gateway and choose which models to use.",
-    "settings.connection": "Gateway connection",
-    "settings.connection.hint": "The address of the server that provides the models. One server can offer several — you don't connect to a model, you connect to its provider.",
-    "settings.override": "Custom endpoint",
-    "settings.override.hint": "Point this model at its own provider. Leave empty to use the gateway above.",
-    "settings.override.badge": "custom endpoint",
-    "settings.override.baseUrlPlaceholder": "https://api.provider.com",
-    "settings.override.apiKeyPlaceholder": "Per-model key (optional)",
-    "settings.connected": "Connected",
-    "settings.notConnected": "Not connected",
-    "settings.baseUrl": "Base URL",
-    "settings.baseUrl.hint": "Your OpenAI-compatible endpoint, e.g. an external LiteLLM gateway. /v1 is added if missing.",
-    "settings.apiKey": "API key",
-    "settings.apiKey.hintStored": "A key is stored. Leave blank to keep it, or type a new one to replace it.",
-    "settings.apiKey.hint": "Sent as a Bearer token. Stored locally in the backend database.",
-    "settings.proxy": "Proxy",
-    "settings.proxy.hint": "Route every outbound request (model calls, discovery, MCP tools) through this proxy. Leave blank for a direct connection.",
-    "settings.proxy.placeholder": "http://user:pass@host:3128",
-    "settings.maxIters": "Max tool iterations",
-    "settings.maxIters.hint": "How many tool-calling rounds the model may take per reply.",
-    "settings.discover": "Discover",
-    "settings.available.title": "Available models",
-    "settings.available.subtitle": "Activate the models you want to use, and pick the default.",
-    "settings.discoverFirst": "Click Discover to load models from your gateway, or type one manually below.",
-    "settings.modelsCount": "{count} models available from the gateway.",
-    "settings.activeModels": "Enabled models",
-    "settings.defaultModel": "Default model",
-    "settings.defaultModel.hint": "Used for new chats unless a project overrides it.",
-    "settings.default": "Default",
-    "settings.setDefault": "Set as default",
-    "settings.addManual": "Add a model id manually",
-    "settings.add": "Add",
-    "settings.noModels": "No models enabled yet.",
-
-    // settings · storage
-    "settings.storage.title": "Storage",
-    "settings.storage.subtitle": "Back up or restore your whole application.",
-    "settings.export": "Export",
-    "settings.export.desc": "Download a JSON file with the categories you select.",
-    "settings.export.button": "Export selection",
-    "settings.import": "Import",
-    "settings.import.desc": "Load a previously exported JSON file. Selected categories will replace existing data.",
-    "settings.import.choose": "Choose file…",
-    "settings.import.button": "Import selection",
-    "settings.import.replaceWarn": "Importing replaces all existing data in the selected categories. This cannot be undone.",
-    "settings.import.done": "Imported: {summary}",
-    "settings.import.empty": "The file has no data for the selected categories.",
-    "settings.cat.settings": "Settings & models",
-    "settings.cat.projects": "Projects",
-    "settings.cat.mcps": "MCPs",
-    "settings.cat.conversations": "Chats & messages",
-    "settings.selectAll": "Select all",
-
-    // chat
+    // chat — used by the view parked for the chat phase
     "chat.disclaimer": "CheveluAI runs on your configured model. Verify important information.",
     "chat.newChat": "New chat",
     "chat.mcpCountOne": "{n} MCP",
@@ -163,7 +131,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "chat.hide": "hide",
     "chat.details": "details",
 
-    // composer "+" menu
+    // composer "+" menu — parked with the chat view
     "composer.add": "Add",
     "composer.attachFiles": "Add files or photos",
     "composer.addToProject": "Add to project",
@@ -179,98 +147,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "composer.mcpEnabled": "Enabled",
     "composer.mcpDisabled": "Disabled",
 
-    // projects
-    "projects.subtitle": "Group conversations, set a pre-prompt, and attach MCP tools.",
-    "projects.new": "New project",
-    "projects.newChat": "New chat",
-    "projects.edit": "Edit",
-    "projects.deleteTitle": "Delete project",
-    "projects.deleteDesc": "“{name}” and its settings will be permanently removed. Conversations are kept.",
-    "projects.mcpCount": "{count} MCP",
-    "projects.noMcps": "No MCPs",
-    "projects.emptyTitle": "No projects yet",
-    "projects.emptyDesc": "Create a project to give your chats a custom pre-prompt and a set of MCP tools.",
-    "projects.newTitle": "New project",
-    "projects.editTitle": "Edit project",
-    "projects.fieldName": "Name",
-    "projects.namePlaceholder": "My project",
-    "projects.fieldDescription": "Description",
-    "projects.descriptionPlaceholder": "Optional",
-    "projects.fieldPrePrompt": "Pre-prompt (system prompt)",
-    "projects.prePromptHint": "Sent as the system message for every chat in this project.",
-    "projects.prePromptPlaceholder": "You are a helpful assistant specialised in…",
-    "projects.fieldModel": "Model override",
-    "projects.modelHint": "Leave empty to use the default model from Settings.",
-    "projects.modelPlaceholder": "(default)",
-    "projects.attachedMcps": "Attached MCPs",
-    "projects.noMcpsYet": "No MCPs yet — create some in the MCPs tab.",
-
-    // mcps
-    "mcps.subtitle": "Tools you can attach to projects — from a URL, your own code, or any OpenAPI spec.",
-    "mcps.newMcp": "New MCP",
-    "mcps.edit": "Edit",
-    "mcps.duplicate": "Duplicate",
-    "mcps.copySuffix": "(Copy)",
-    "mcps.project": "project",
-    "mcps.projects": "projects",
-    "mcps.enabled": "Enabled",
-    "mcps.disabled": "Disabled",
-    "mcps.toolsTitle": "Tools",
-    "mcps.toolsActiveOfTotal": "{active}/{total} on",
-    "mcps.searchTools": "Search tools…",
-    "mcps.enableAll": "Enable all",
-    "mcps.disableAll": "Disable all",
-    "mcps.noToolsMatch": "No tools match “{query}”.",
-    "mcps.editMcp": "Edit MCP",
-    "mcps.testing": "Testing…",
-    "mcps.previewTools": "Preview tools",
-    "mcps.type.openapi.label": "OpenAPI",
-    "mcps.type.openapi.blurb": "Generate tools on the fly from an openapi.json (e.g. FastAPI).",
-    "mcps.type.remote.label": "Remote",
-    "mcps.type.remote.blurb": "Connect to an existing MCP server over HTTP.",
-    "mcps.type.code.label": "Code",
-    "mcps.type.code.blurb": "Define tools with your own Python.",
-    "mcps.name": "Name",
-    "mcps.namePlaceholder": "My API tools",
-    "mcps.description": "Description",
-    "mcps.optional": "Optional",
-    "mcps.specUrl": "OpenAPI spec URL",
-    "mcps.specUrlHint": "e.g. http://localhost:8000/openapi.json — fetched when tools run.",
-    "mcps.specText": "…or paste the spec JSON",
-    "mcps.specTextHint": "Used if no URL is set (or to pin a fixed version).",
-    "mcps.baseUrl": "Base URL override",
-    "mcps.baseUrlHint": "Where requests are sent. Defaults to the spec's servers / the URL origin.",
-    "mcps.scheme": "Scheme",
-    "mcps.host": "Host",
-    "mcps.port": "Port",
-    "mcps.path": "Path",
-    "mcps.pathHint": "The MCP endpoint path on the server (often /mcp or /sse).",
-    "mcps.resolvedEndpoint": "Resolved endpoint:",
-    "mcps.pythonCode": "Python code",
-    "mcps.pythonCodeHint": "Define TOOLS (list) and call(name, arguments). Runs in-process.",
-    "mcps.headers": "Headers (JSON)",
-    "mcps.headersHint": "Optional auth headers sent with each request.",
-    "mcps.attachProjects": "Attach to projects",
-    "mcps.noProjects": "No projects yet.",
-    "mcps.toolGenerated": "tool generated",
-    "mcps.toolsGenerated": "tools generated",
-    "mcps.testConnection": "Test connection",
-    "mcps.tool": "tool",
-    "mcps.tools": "tools",
-    "mcps.error": "error",
-    "mcps.checkTools": "Check Tools",
-    "mcps.refresh": "Refresh",
-    "mcps.refreshTools": "Refresh Tools",
-    "mcps.noToolsExposed": "No tools exposed.",
-    "mcps.emptyTitle": "No MCPs yet",
-    "mcps.emptyBody": "Add a remote MCP server, write your own tools in Python, or generate them from an OpenAPI spec.",
-    "mcps.deleteTitle": "Delete MCP",
-    "mcps.deleteDescription": "“{name}” will be permanently removed and detached from any projects.",
-    "mcps.pythonProject": "Python project",
-    "mcps.pythonProjectHint": "A small file tree. The entry file defines TOOLS (list) and call(name, arguments). Runs in-process.",
-    "mcps.openEditor": "Open editor",
-
-    // code editor (IDE)
+    // code editor (IDE) — reused as the skill editor
     "editor.title": "Code editor",
     "editor.explorer": "Explorer",
     "editor.entry": "Entry",
@@ -301,6 +178,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "common.saved": "Enregistré",
     "common.cancel": "Annuler",
     "common.delete": "Supprimer",
+    "common.remove": "Retirer",
     "common.rename": "Renommer",
     "common.move": "Déplacer",
     "common.back": "Retour",
@@ -308,39 +186,54 @@ const dict: Record<Lang, Record<string, string>> = {
     "common.create": "Créer",
     "common.loading": "Chargement…",
 
-    "nav.chat": "Discussion",
-    "nav.projects": "Projets",
-    "nav.mcps": "MCPs",
+    "nav.home": "Accueil",
     "nav.settings": "Paramètres",
     "nav.toggleTheme": "Changer de thème",
     "nav.expandSidebar": "Déplier le panneau",
     "nav.collapseSidebar": "Replier le panneau",
+    "nav.resizeHint": "Glisser pour redimensionner · double-clic pour replier",
 
-    "threads.title": "Conversations",
-    "threads.sortProjects": "Trier les projets",
-    "threads.mostRecent": "Plus récents",
-    "threads.nameAsc": "Nom (A–Z)",
-    "threads.none": "Aucune conversation pour l’instant.",
-    "threads.noConversations": "Aucune conversation",
-    "threads.dropHere": "Déposer ici",
-    "threads.noProject": "Sans projet",
-    "threads.newChatIn": "Nouvelle discussion dans {name}",
-    "threads.edit": "Modifier {name}",
-    "threads.doubleClickRename": "Double-cliquez pour renommer",
+    "sidebar.projects": "Projets",
+    "sidebar.none": "Aucun projet pour l’instant",
+    "sidebar.openFolder": "Ouvrir un dossier",
+    "sidebar.sort": "Trier les projets",
+    "sidebar.sortRecent": "Plus récents",
+    "sidebar.sortName": "Nom (A–Z)",
 
-    "confirm.deleteConv.title": "Supprimer la conversation",
-    "confirm.deleteConv.desc": "« {title} » sera définitivement supprimée.",
-    "confirm.renameConv.title": "Renommer la conversation",
-    "confirm.renameConv.desc": "Renommer « {from} » en « {to} » ?",
-    "confirm.renameProj.title": "Renommer le projet",
-    "confirm.renameProj.desc": "Renommer « {from} » en « {to} » ?",
-    "confirm.moveConv.title": "Déplacer la conversation",
-    "confirm.moveConv.desc": "Déplacer « {title} » vers « {target} » ?",
+    "welcome.title": "Bienvenue dans AMOS",
+    "welcome.subtitle":
+      "Ouvrez un dossier de projet pour gérer ses agents, skills et serveurs MCP — côté Claude comme côté Codex.",
+    "welcome.openFolder": "Ouvrir un dossier",
+    "welcome.opening": "Ouverture…",
+    "welcome.recents": "Projets récents",
+    "welcome.noRecents": "Aucun projet pour l’instant — ouvrez un dossier pour commencer.",
+    "welcome.openFailed": "Impossible d’ouvrir ce dossier : {error}",
+
+    "projects.never": "Jamais ouvert",
+    "projects.lastOpened": "Ouvert {when}",
+    "projects.remove": "Retirer d’AMOS",
+    "projects.removeTitle": "Retirer le projet",
+    "projects.removeDesc":
+      "« {name} » sera retiré d’AMOS. Le dossier sur le disque n’est pas modifié.",
+
+    "project.overview": "Vue d’ensemble",
+    "project.folder": "Dossier",
+    "project.notFound": "Projet inconnu",
+    "project.notFoundDesc": "Ce projet n’est (plus) enregistré dans AMOS.",
+    "project.backHome": "Retour à l’accueil",
+    "project.agents": "Agents",
+    "project.skills": "Skills",
+    "project.mcps": "Serveurs MCP",
+    "project.scanSoon": "L’analyse de ce dossier arrive à la prochaine itération.",
+
+    "time.now": "à l’instant",
+    "time.minutes": "il y a {n} min",
+    "time.hours": "il y a {n} h",
+    "time.days": "il y a {n} j",
+    "time.weeks": "il y a {n} sem.",
 
     "settings.title": "Paramètres",
     "settings.general": "Général",
-    "settings.models": "Modèles",
-    "settings.storage": "Stockage",
     "settings.backToApp": "Retour à l’app",
 
     "settings.general.title": "Général",
@@ -351,59 +244,6 @@ const dict: Record<Lang, Record<string, string>> = {
     "settings.theme.system": "Système",
     "settings.language": "Langue",
     "settings.language.hint": "Langue de l’interface. Appliquée immédiatement.",
-
-    "settings.models.title": "Modèles",
-    "settings.models.subtitle": "Connectez une passerelle et choisissez les modèles à utiliser.",
-    "settings.connection": "Connexion au serveur",
-    "settings.connection.hint": "L’adresse du serveur qui fournit les modèles. Un serveur peut en proposer plusieurs — on ne se connecte pas à un modèle, mais à son fournisseur.",
-    "settings.override": "Point d’accès personnalisé",
-    "settings.override.hint": "Dirige ce modèle vers son propre fournisseur. Laissez vide pour utiliser le serveur ci-dessus.",
-    "settings.override.badge": "perso",
-    "settings.override.baseUrlPlaceholder": "https://api.fournisseur.com",
-    "settings.override.apiKeyPlaceholder": "Clé du modèle (facultatif)",
-    "settings.connected": "Connecté",
-    "settings.notConnected": "Non connecté",
-    "settings.baseUrl": "URL de base",
-    "settings.baseUrl.hint": "Votre point d’accès compatible OpenAI, par ex. une passerelle LiteLLM externe. /v1 est ajouté si absent.",
-    "settings.apiKey": "Clé API",
-    "settings.apiKey.hintStored": "Une clé est enregistrée. Laissez vide pour la conserver, ou saisissez-en une nouvelle pour la remplacer.",
-    "settings.apiKey.hint": "Envoyée comme jeton Bearer. Stockée localement dans la base du backend.",
-    "settings.proxy": "Proxy",
-    "settings.proxy.hint": "Fait passer toutes les requêtes sortantes (appels aux modèles, découverte, outils MCP) par ce proxy. Laissez vide pour une connexion directe.",
-    "settings.proxy.placeholder": "http://user:pass@host:3128",
-    "settings.maxIters": "Itérations d’outils max",
-    "settings.maxIters.hint": "Nombre de tours d’appels d’outils autorisés par réponse.",
-    "settings.discover": "Découvrir",
-    "settings.available.title": "Modèles disponibles",
-    "settings.available.subtitle": "Activez les modèles à utiliser et choisissez le modèle par défaut.",
-    "settings.discoverFirst": "Cliquez sur Découvrir pour charger les modèles de votre passerelle, ou saisissez-en un manuellement ci-dessous.",
-    "settings.modelsCount": "{count} modèles disponibles sur la passerelle.",
-    "settings.activeModels": "Modèles activés",
-    "settings.defaultModel": "Modèle par défaut",
-    "settings.defaultModel.hint": "Utilisé pour les nouvelles discussions, sauf si un projet le remplace.",
-    "settings.default": "Par défaut",
-    "settings.setDefault": "Définir par défaut",
-    "settings.addManual": "Ajouter un identifiant de modèle manuellement",
-    "settings.add": "Ajouter",
-    "settings.noModels": "Aucun modèle activé pour l’instant.",
-
-    "settings.storage.title": "Stockage",
-    "settings.storage.subtitle": "Sauvegardez ou restaurez l’ensemble de l’application.",
-    "settings.export": "Exporter",
-    "settings.export.desc": "Téléchargez un fichier JSON avec les catégories sélectionnées.",
-    "settings.export.button": "Exporter la sélection",
-    "settings.import": "Importer",
-    "settings.import.desc": "Chargez un fichier JSON exporté précédemment. Les catégories sélectionnées remplaceront les données existantes.",
-    "settings.import.choose": "Choisir un fichier…",
-    "settings.import.button": "Importer la sélection",
-    "settings.import.replaceWarn": "L’import remplace toutes les données existantes des catégories sélectionnées. Cette action est irréversible.",
-    "settings.import.done": "Importé : {summary}",
-    "settings.import.empty": "Le fichier ne contient pas de données pour les catégories sélectionnées.",
-    "settings.cat.settings": "Paramètres & modèles",
-    "settings.cat.projects": "Projets",
-    "settings.cat.mcps": "MCPs",
-    "settings.cat.conversations": "Discussions & messages",
-    "settings.selectAll": "Tout sélectionner",
 
     "chat.disclaimer": "CheveluAI utilise le modèle que vous avez configuré. Vérifiez les informations importantes.",
     "chat.newChat": "Nouvelle discussion",
@@ -435,7 +275,6 @@ const dict: Record<Lang, Record<string, string>> = {
     "chat.hide": "masquer",
     "chat.details": "détails",
 
-    // composer "+" menu
     "composer.add": "Ajouter",
     "composer.attachFiles": "Ajouter des fichiers ou des photos",
     "composer.addToProject": "Ajouter au projet",
@@ -451,98 +290,6 @@ const dict: Record<Lang, Record<string, string>> = {
     "composer.mcpEnabled": "Activé",
     "composer.mcpDisabled": "Désactivé",
 
-    // projects
-    "projects.subtitle": "Regroupez des conversations, définissez un pré-prompt et associez des outils MCP.",
-    "projects.new": "Nouveau projet",
-    "projects.newChat": "Nouvelle discussion",
-    "projects.edit": "Modifier",
-    "projects.deleteTitle": "Supprimer le projet",
-    "projects.deleteDesc": "« {name} » et ses paramètres seront définitivement supprimés. Les conversations sont conservées.",
-    "projects.mcpCount": "{count} MCP",
-    "projects.noMcps": "Aucun MCP",
-    "projects.emptyTitle": "Aucun projet pour l’instant",
-    "projects.emptyDesc": "Créez un projet pour donner à vos discussions un pré-prompt personnalisé et un ensemble d’outils MCP.",
-    "projects.newTitle": "Nouveau projet",
-    "projects.editTitle": "Modifier le projet",
-    "projects.fieldName": "Nom",
-    "projects.namePlaceholder": "Mon projet",
-    "projects.fieldDescription": "Description",
-    "projects.descriptionPlaceholder": "Facultatif",
-    "projects.fieldPrePrompt": "Pré-prompt (message système)",
-    "projects.prePromptHint": "Envoyé comme message système pour chaque discussion de ce projet.",
-    "projects.prePromptPlaceholder": "Vous êtes un assistant spécialisé dans…",
-    "projects.fieldModel": "Remplacement du modèle",
-    "projects.modelHint": "Laissez vide pour utiliser le modèle par défaut défini dans les Paramètres.",
-    "projects.modelPlaceholder": "(par défaut)",
-    "projects.attachedMcps": "MCP associés",
-    "projects.noMcpsYet": "Aucun MCP pour l’instant — créez-en dans l’onglet MCPs.",
-
-    // mcps
-    "mcps.subtitle": "Des outils que vous pouvez rattacher à vos projets — depuis une URL, votre propre code ou n’importe quelle spécification OpenAPI.",
-    "mcps.newMcp": "Nouveau MCP",
-    "mcps.edit": "Modifier",
-    "mcps.duplicate": "Dupliquer",
-    "mcps.copySuffix": "(Copie)",
-    "mcps.project": "projet",
-    "mcps.projects": "projets",
-    "mcps.enabled": "Activé",
-    "mcps.disabled": "Désactivé",
-    "mcps.toolsTitle": "Outils",
-    "mcps.toolsActiveOfTotal": "{active}/{total} actifs",
-    "mcps.searchTools": "Rechercher des outils…",
-    "mcps.enableAll": "Tout activer",
-    "mcps.disableAll": "Tout désactiver",
-    "mcps.noToolsMatch": "Aucun outil ne correspond à « {query} ».",
-    "mcps.editMcp": "Modifier le MCP",
-    "mcps.testing": "Test en cours…",
-    "mcps.previewTools": "Prévisualiser les outils",
-    "mcps.type.openapi.label": "OpenAPI",
-    "mcps.type.openapi.blurb": "Générez des outils à la volée à partir d’un openapi.json (par exemple FastAPI).",
-    "mcps.type.remote.label": "Distant",
-    "mcps.type.remote.blurb": "Connectez-vous à un serveur MCP existant via HTTP.",
-    "mcps.type.code.label": "Code",
-    "mcps.type.code.blurb": "Définissez des outils avec votre propre code Python.",
-    "mcps.name": "Nom",
-    "mcps.namePlaceholder": "Mes outils d’API",
-    "mcps.description": "Description",
-    "mcps.optional": "Facultatif",
-    "mcps.specUrl": "URL de la spécification OpenAPI",
-    "mcps.specUrlHint": "par exemple http://localhost:8000/openapi.json — récupérée lors de l’exécution des outils.",
-    "mcps.specText": "…ou collez le JSON de la spécification",
-    "mcps.specTextHint": "Utilisé si aucune URL n’est définie (ou pour figer une version fixe).",
-    "mcps.baseUrl": "Remplacement de l’URL de base",
-    "mcps.baseUrlHint": "Où les requêtes sont envoyées. Par défaut, les serveurs de la spécification ou l’origine de l’URL.",
-    "mcps.scheme": "Schéma",
-    "mcps.host": "Hôte",
-    "mcps.port": "Port",
-    "mcps.path": "Chemin",
-    "mcps.pathHint": "Le chemin du point de terminaison MCP sur le serveur (souvent /mcp ou /sse).",
-    "mcps.resolvedEndpoint": "Endpoint résolu :",
-    "mcps.pythonCode": "Code Python",
-    "mcps.pythonCodeHint": "Définissez TOOLS (liste) et call(name, arguments). Exécuté dans le processus.",
-    "mcps.headers": "En-têtes (JSON)",
-    "mcps.headersHint": "En-têtes d’authentification facultatifs envoyés avec chaque requête.",
-    "mcps.attachProjects": "Rattacher à des projets",
-    "mcps.noProjects": "Aucun projet pour le moment.",
-    "mcps.toolGenerated": "outil généré",
-    "mcps.toolsGenerated": "outils générés",
-    "mcps.testConnection": "Tester la connexion",
-    "mcps.tool": "outil",
-    "mcps.tools": "outils",
-    "mcps.error": "erreur",
-    "mcps.checkTools": "Vérifier les outils",
-    "mcps.refresh": "Actualiser",
-    "mcps.refreshTools": "Actualiser les outils",
-    "mcps.noToolsExposed": "Aucun outil exposé.",
-    "mcps.emptyTitle": "Aucun MCP pour le moment",
-    "mcps.emptyBody": "Ajoutez un serveur MCP distant, écrivez vos propres outils en Python ou générez-les à partir d’une spécification OpenAPI.",
-    "mcps.deleteTitle": "Supprimer le MCP",
-    "mcps.deleteDescription": "« {name} » sera définitivement supprimé et détaché de tous les projets.",
-    "mcps.pythonProject": "Projet Python",
-    "mcps.pythonProjectHint": "Une petite arborescence de fichiers. Le fichier d’entrée définit TOOLS (liste) et call(name, arguments). Exécuté dans le processus.",
-    "mcps.openEditor": "Ouvrir l’éditeur",
-
-    // éditeur de code (IDE)
     "editor.title": "Éditeur de code",
     "editor.explorer": "Explorateur",
     "editor.entry": "Entrée",
@@ -597,8 +344,9 @@ export const useLang = create<LangState>((set) => ({
     document.documentElement.lang = l;
     set({ lang: l });
     if (opts.persist !== false) {
-      // mirror to the backend so the choice is captured by export/import
-      api.updateSettings({ language: l }).catch(() => {});
+      // mirror into the main-process database so the choice survives a reset
+      // of the renderer's local storage
+      ipc.setSetting(LANG_SETTING, l).catch(() => {});
     }
   },
 }));
@@ -610,13 +358,28 @@ export function useT(): TFunc {
   return (key, vars) => translate(lang, key, vars);
 }
 
-// Adopt the backend-stored language on first load when the user has never
-// made an explicit local choice (fresh install, or just after a Storage import).
+// Adopt the persisted language on first load when the user has never made an
+// explicit local choice (fresh install, or a brand new renderer profile).
 let adopted = hadStoredLang;
-export function adoptBackendLanguage(lang?: string) {
+export function adoptStoredLanguage(lang?: string | null) {
   if (adopted || !lang) return;
   adopted = true;
   if (LANGUAGES.some((l) => l.value === lang)) {
     useLang.getState().setLang(lang as Lang, { persist: false });
   }
+}
+
+/** Localised, compact "time since" label used by the recents lists. */
+export function relativeTime(t: TFunc, iso: string | null): string {
+  if (!iso) return t("projects.never");
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return t("projects.never");
+  const minutes = Math.floor(Math.max(0, Date.now() - then) / 60_000);
+  if (minutes < 1) return t("time.now");
+  if (minutes < 60) return t("time.minutes", { n: minutes });
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return t("time.hours", { n: hours });
+  const days = Math.floor(hours / 24);
+  if (days < 7) return t("time.days", { n: days });
+  return t("time.weeks", { n: Math.floor(days / 7) });
 }
