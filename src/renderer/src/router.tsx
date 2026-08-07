@@ -1,4 +1,5 @@
 import {
+  createHashHistory,
   createRootRoute,
   createRoute,
   createRouter,
@@ -109,8 +110,11 @@ const routeTree = rootRoute.addChildren([
   ]),
 ]);
 
+// Hash history: the packaged app is served from `file://`, where path-based
+// history has no server to fall back on.
 export const router = createRouter({
   routeTree,
+  history: createHashHistory(),
   defaultPreload: "intent",
 });
 

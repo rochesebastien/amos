@@ -1,0 +1,52 @@
+appId: com.amos.app
+productName: AMOS
+copyright: Copyright © 2026 AMOS
+
+directories:
+  buildResources: build
+  output: release/${version}
+
+files:
+  - out/**
+  - package.json
+  - "!**/{.eslintrc,.editorconfig,.prettierrc,.npmrc}"
+  - "!**/{.vscode,.idea,.github,tests,src,build}"
+  - "!**/*.{map,md,ts,tsx}"
+  - "!electron.vite.config.*"
+  - "!tsconfig*.json"
+
+asar: true
+# Native modules (better-sqlite3 from P1 on) must live outside the asar archive.
+asarUnpack:
+  - resources/**
+  - "**/*.node"
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: ${productName}-${version}-setup.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  shortcutName: AMOS
+
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+  category: public.app-category.developer-tools
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+dmg:
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+linux:
+  target:
+    - dir
+  category: Development
+
+npmRebuild: true

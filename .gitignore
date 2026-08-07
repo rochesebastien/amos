@@ -16,6 +16,12 @@ dist-ssr/
 *.local
 .vite/
 
+# Electron
+out/
+release/
+electron.vite.config.*.mjs
+electron.vite.config.*.cjs
+
 # Env
 .env
 .env.*
