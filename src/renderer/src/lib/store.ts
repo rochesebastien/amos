@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { STORAGE_KEYS } from "./storage";
 
 // App-wide UI preferences that aren't part of the URL. Navigation and server
 // data now live in TanStack Router and TanStack Query respectively; this store
@@ -11,7 +12,7 @@ type AppState = {
   setTheme: (t: ThemeMode) => void;
 };
 
-const THEME_KEY = "cheveluai.theme";
+const THEME_KEY = STORAGE_KEYS.theme;
 
 function applyTheme(mode: ThemeMode) {
   const isDark =

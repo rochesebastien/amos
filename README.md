@@ -1,109 +1,119 @@
-# CheveluAI
+# AMOS
 
-![CheveluAI](github_cover.png)
+**A**gentic **M**anagement and **O**rchestrator **S**oftware — a desktop app for
+the `.claude/` and `.codex/` folders scattered across your projects.
 
-A self-hosted, Codex-style AI workspace. Chat with your own model, organize work
-into **Projects** (each with its own pre-prompt), and manage **MCP** servers that
-you can attach to projects to give the model tools.
+Coding agents keep their configuration on disk, in a dozen small files nobody
+remembers the shape of: `.claude/agents/*.md`, `.claude/skills/*/SKILL.md`,
+`.mcp.json`, `CLAUDE.md`, `AGENTS.md`, `.codex/config.toml`. AMOS opens a project
+folder, shows you everything both ecosystems declare for it — project-level and
+global — lets you edit it safely, and lets you chat with the project through the
+CLI you already have installed.
 
-CheveluAI ships **not connected to any model**. You point it at *your own*
-OpenAI-compatible endpoint — typically an external [LiteLLM](https://docs.litellm.ai/)
-gateway — from **Settings**. Nothing about the model is hardcoded.
+It is an Electron app (Windows + macOS + Linux), all TypeScript, no server and no
+account.
 
-## Features
+## What it does
 
-- **Chat** — streaming conversations, agentic tool-calling, conversation history,
-  and a **model picker in the composer** to switch model per message.
-- **Projects** — group conversations, give each a custom system pre-prompt, an
-  optional model override, and attach one or more MCPs.
-- **MCP management (CRUD)** — create MCPs three ways and attach them to any
-  number of projects:
-  1. **Remote** — connect to an existing MCP server over streamable HTTP (JSON-RPC).
-  2. **Code** — build a small Python project in an integrated, VSCode-style
-     editor (file tree + import-your-project), with one entry file that defines
-     the tools.
-  3. **OpenAPI** — drop in an `openapi.json` (e.g. from a FastAPI app) or its URL
-     and an MCP tool set is **generated on the fly** from the spec.
-- **Settings** — a dedicated settings workspace with its own sidebar, split into
-  three sections:
-  - **General** — appearance (light / dark / system) and **interface language
-    with full English / French i18n**.
-  - **Models** — configure the gateway connection (base URL, API key, max tool
-    iterations), **discover** models from the gateway's `/v1/models`, **activate**
-    the ones you want, pick a **default model**, and optionally give any model its
-    own **per-model connection override** (its own base URL + API key) to hit a
-    provider directly without a gateway.
-  - **Storage** — **export** your whole app to a single JSON file and **import**
-    it back, with per-category filtering (settings & models, projects, MCPs,
-    chats & messages).
+- **Scans a project, both ecosystems at once.** Point AMOS at a folder and it
+  reads the Claude tree (`.claude/agents`, `.claude/skills`, `.mcp.json`,
+  `CLAUDE.md`, plus your global `~/.claude`) and the Codex tree (`AGENTS.md` at
+  the root and nested, `.codex/skills`, `.codex/config.toml`, plus `~/.codex`).
+  Agents, skills and MCP servers land in one list, badged by **ecosystem**
+  (Claude / Codex) and **scope** (project / global).
+- **Shows broken files instead of hiding them.** A `SKILL.md` with unparsable
+  frontmatter or a malformed `.mcp.json` gets a *broken* badge and a pointer to
+  the file, rather than silently disappearing from the list.
+- **Edits them, carefully.** A form editor for agent frontmatter + markdown body,
+  a file-tree editor for skill folders, and a transport-aware editor for MCP
+  servers across `.mcp.json`, `~/.claude.json` and `config.toml`. Writes are
+  atomic (temp file → fsync → rename), keep a rotating `.bak`, refuse to clobber
+  a file that changed under you (with a reload/overwrite dialog), and **pass
+  through every key AMOS has no field for** — your config is read-modify-written,
+  never regenerated from a partial model.
+- **Watches the filesystem.** Edit a file in your editor, or let an agent rewrite
+  it, and the views refresh. The filesystem is the source of truth; AMOS never
+  stores a copy of your capabilities.
+- **Chats with the project, on your own subscription.** AMOS drives the
+  **`claude` and `codex` CLIs already installed and logged in on your machine** —
+  `@anthropic-ai/claude-agent-sdk` for Claude, `codex app-server` for Codex. Your
+  Claude Pro/Max or ChatGPT plan comes from the CLI itself: AMOS never asks for
+  an API key, never sees a token, and stores neither. Sessions and their resume
+  tokens are kept locally in SQLite so you can pick a conversation back up.
+- **English and French**, everywhere, and a light/dark theme.
 
-## Architecture
+## What it deliberately does not do
 
-```
-frontend/   React + Vite + TypeScript + Tailwind v4 (Mona Sans, custom palette)
-            TanStack Router (URL routing) + TanStack Query (server state)
-            shadcn/ui primitives, incl. the AI components (Message, Bubble,
-            Marker, Attachment) and the @shadcn/react Message Scroller for the
-            chat transcript
-backend/    FastAPI + SQLModel (SQLite) — LLM proxy, MCP runtime, OpenAPI→tools
-```
+No API keys, no OAuth, no hosted backend, no telemetry. If neither CLI is
+installed, the chat is gated behind a setup screen that tells you what to install
+— everything else keeps working.
 
-## Running locally
+## Requirements
 
-### Backend
+- Node 22+ (development only).
+- For chat: the [Claude Code CLI](https://docs.claude.com/en/docs/claude-code)
+  and/or the [Codex CLI](https://developers.openai.com/codex/cli), installed and
+  already signed in. AMOS detects them on `PATH` (and in the usual install
+  locations); on macOS, where an app launched from the Dock does not inherit your
+  shell's `PATH`, you can point it at a binary by hand in **Settings →
+  Backends**.
 
-```bash
-cd backend
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
-```
-
-### Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev        # http://localhost:5173 (proxies /api to :8000)
-```
-
-Then open the app, go to **Settings → Models**, enter your LiteLLM base URL +
-API key, **Discover** and activate a model (set one as default), and start
-chatting.
-
-## Deployment (Docker / Dokploy)
-
-CheveluAI ships as a **single container**: the multi-stage [`Dockerfile`](./Dockerfile)
-builds the frontend, then the FastAPI backend serves both the API (`/api/*`) and
-the built static app (with an SPA fallback so client-side routes work on refresh).
-SQLite is stored on a volume so data survives redeploys.
+## Development
 
 ```bash
-# build & run locally
-docker compose up --build        # → http://localhost:8000
+npm install          # postinstall rebuilds better-sqlite3 for Electron's ABI
+npm run dev          # electron-vite dev, renderer HMR
 ```
 
-### On Dokploy
+```bash
+npm run typecheck    # tsc -b over the main/preload and renderer projects
+npm test             # vitest — scanner, writers, watch, drivers, i18n parity
+npm run build        # typecheck + electron-vite build into out/
+```
 
-1. Create a new application from this repository.
-2. Build type: **Docker Compose** (uses [`docker-compose.yml`](./docker-compose.yml))
-   or **Dockerfile** (uses [`Dockerfile`](./Dockerfile)) — either works.
-3. Attach a **persistent volume** mounted at `/data` (the SQLite DB lives at
-   `/data/cheveluai.db`, set via `CHEVELUAI_DB`).
-4. Set the application **port to `8000`** and point your domain at it; Dokploy's
-   Traefik handles TLS.
-5. Deploy, then open **Settings → Models** and connect your model as above.
+> **`better-sqlite3` has two ABIs and only one slot.** Electron and Node are not
+> binary-compatible, so `npm test` swaps the compiled module to the Node ABI and
+> `npm run dev` / `npm run build` swap it back (`scripts/native-deps.mjs`). Use
+> the npm scripts — a bare `vitest` right after a build, or a bare `electron-vite
+> dev` right after a test run, fails with `NODE_MODULE_VERSION` mismatch.
 
-| Env var            | Default                 | Purpose                                  |
-| ------------------ | ----------------------- | ---------------------------------------- |
-| `CHEVELUAI_DB`     | `/data/cheveluai.db`    | SQLite database path (put it on a volume)|
-| `CHEVELUAI_STATIC` | `/app/static`           | Directory of the built frontend to serve |
+### Packaging
 
-The LLM connection (base URL, key, model) is configured at runtime from
-**Settings** — nothing model-related needs to be baked into the image.
+`electron-builder.yml` produces an NSIS installer on Windows, a DMG + zip on
+macOS (x64 + arm64), and an unpacked directory on Linux. App icons are generated
+from `src/renderer/src/assets/logo.svg` by `node scripts/gen-icons.mjs`.
+
+```bash
+npm run build
+npx electron-builder --linux dir     # unpacked tree in release/<version>/
+npx electron-builder --win nsis      # on Windows
+npx electron-builder --mac           # on macOS, for signing/notarisation
+```
+
+Windows and macOS artifacts must be built (and signed) on their own OS; only the
+Linux `dir` target is exercised from a Linux box.
+
+## Layout
+
+```
+src/
+├── shared/     ipc.ts (the typed IPC contract) · capabilities.ts · chat.ts
+├── main/       index.ts · ipc.ts (zod-validated handlers)
+│   ├── db/         better-sqlite3 + PRAGMA user_version migrations
+│   ├── services/   projects · settings · sessions · safeWrite
+│   ├── scanner/    claude · codex · schemas · writers · watch
+│   └── chat/       detect · claudeDriver · codexDriver · echo · manager
+├── preload/    contextBridge → window.amos
+└── renderer/   React 18 · TanStack Router (hash history) + Query · Tailwind v4
+tests/          vitest, with fixture project trees under tests/fixtures/
+```
+
+The renderer runs with `contextIsolation: true`, `sandbox: true` and
+`nodeIntegration: false`: it has no filesystem and no Node. Every disk or process
+operation goes through a typed IPC channel validated in the main process.
 
 ## Design
 
-See [`DESIGN.md`](./DESIGN.md). CheveluAI adapts that system with its own palette:
-primary `#00ED64`, background `#FFFFEB`, secondary `#001E2B`, and the open-source
-variable **Mona Sans** typeface (ExtraBold for display, Medium for body).
+See [`DESIGN.md`](./DESIGN.md) — tokens, typography, the brand mark, and the
+layout rules the UI follows. Palette: primary `#00ED64`, background `#FFFFEB`,
+secondary `#001E2B`, in **Mona Sans**.

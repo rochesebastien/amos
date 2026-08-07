@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <!-- Electron's renderer needs JIT and writable-executable memory. -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <!-- better-sqlite3 and the claude-agent-sdk load .node binaries that are
+         not signed by us. -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+    <true/>
+    <!-- AMOS chats by spawning the user's own `claude` / `codex` CLI; child
+         processes must inherit the sandbox rather than be blocked. -->
+    <key>com.apple.security.inherit</key>
+    <true/>
+  </dict>
+</plist>

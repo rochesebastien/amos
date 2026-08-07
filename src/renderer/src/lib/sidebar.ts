@@ -1,12 +1,13 @@
 import { create } from "zustand";
+import { STORAGE_KEYS } from "./storage";
 
 export type ProjectSort = "recent" | "name";
 
-const WIDTH_KEY = "cheveluai.sidebar.width";
-const COLLAPSED_KEY = "cheveluai.sidebar.collapsed";
-const SORT_KEY = "cheveluai.projects.sort";
+const WIDTH_KEY = STORAGE_KEYS.sidebarWidth;
+const COLLAPSED_KEY = STORAGE_KEYS.sidebarCollapsed;
+const SORT_KEY = STORAGE_KEYS.projectsSort;
 /** Ids of the projects whose Agents / MCPs / Skills sections are unfolded. */
-const EXPANDED_KEY = "cheveluai.projects.expanded";
+const EXPANDED_KEY = STORAGE_KEYS.projectsExpanded;
 
 export const SIDEBAR_MIN = 240;
 export const SIDEBAR_MAX = 480;

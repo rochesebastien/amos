@@ -3,6 +3,8 @@
   "private": true,
   "version": "0.1.0",
   "description": "AMOS — Agentic Management and Orchestrator Software",
+  "author": "AMOS",
+  "license": "MIT",
   "type": "module",
   "main": "out/main/index.js",
   "scripts": {
@@ -11,6 +13,7 @@
     "preview": "electron-vite preview",
     "typecheck": "tsc -b --force tsconfig.node.json tsconfig.web.json",
     "test": "npm run rebuild:node && vitest run",
+    "icons": "node scripts/gen-icons.mjs",
     "rebuild:node": "node scripts/native-deps.mjs node",
     "rebuild:electron": "node scripts/native-deps.mjs electron",
     "postinstall": "node scripts/native-deps.mjs electron"

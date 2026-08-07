@@ -26,5 +26,8 @@
     "src/preload/**/*.ts",
     "src/shared/**/*.ts",
     "tests/**/*.ts"
-  ]
+  ],
+  // Renderer-side tests belong to the web project: they import modules written
+  // against bundler resolution and the DOM lib.
+  "exclude": ["tests/renderer"]
 }

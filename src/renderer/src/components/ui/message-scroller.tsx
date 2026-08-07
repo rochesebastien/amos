@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 
 // shadcn "Message Scroller" — a chat transcript scroller. Behavior comes from
 // the headless @shadcn/react primitive; this file is the styled frame, themed
-// to the CheveluAI tokens. See docs/components/message-scroller.
+// to the AMOS tokens. See docs/components/message-scroller.
 
 const MessageScrollerProvider = Primitive.Provider;
 

@@ -3,7 +3,7 @@ import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-// shadcn "Bubble" — framed conversational content. Adapted to the CheveluAI
+// shadcn "Bubble" — framed conversational content. Adapted to the AMOS
 // palette and tokens. See DESIGN.md / docs/components/bubble.
 
 const bubbleVariants = cva(

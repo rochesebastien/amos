@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 // shadcn "Attachment" — a file or image attachment with media, metadata,
-// upload state, and actions. Adapted to the CheveluAI tokens.
+// upload state, and actions. Adapted to the AMOS tokens.
 
 type AttachmentState = "idle" | "uploading" | "processing" | "error" | "done";
 

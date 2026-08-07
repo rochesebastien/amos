@@ -61,8 +61,7 @@ import {
 } from "@/components/ui/message-scroller";
 import { useConfirm } from "@/components/ui/confirm";
 import { cn } from "@/lib/utils";
-import logoIcon from "@/assets/logo.png";
-import logoWaitingPrompt from "@/assets/logo_waiting_prompt.png";
+import { LogoMark } from "@/components/Logo";
 
 /**
  * Chat with the project, through the CLI the user already pays for.
@@ -259,7 +258,7 @@ export function ChatView() {
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-3xl px-6 py-6">
             <div className="flex flex-col items-center justify-center gap-3 pt-[12vh] text-center">
-              <img src={logoWaitingPrompt} alt="" className="size-16 object-contain" />
+              <LogoMark className="size-16" />
               <h2 className="text-2xl font-display">{t("chat.emptyTitle")}</h2>
               <p className="max-w-md text-sm text-muted-foreground">
                 {t("chat.emptyInProject", { name: project.name })}
@@ -505,7 +504,7 @@ function ChatMessageRow({
   return (
     <MessageRow align="start">
       <MessageAvatar>
-        <img src={logoIcon} alt="" className="size-7 object-contain" />
+        <LogoMark className="size-7" />
       </MessageAvatar>
       <MessageContent>
         <MessageHeader>{t(`chat.backend.${backend}`)}</MessageHeader>

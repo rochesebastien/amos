@@ -6,25 +6,50 @@ directories:
   buildResources: build
   output: release/${version}
 
+# `out/**` is the electron-vite bundle (main is ESM — package.json must ship for
+# its `"type": "module"`). Production dependencies are pulled in automatically;
+# only the externalised ones (better-sqlite3, chokidar, gray-matter, smol-toml,
+# zod, @anthropic-ai/claude-agent-sdk) actually end up there.
+# Listing positive patterns already excludes everything else at the app root
+# (src/, tests/, build/, scripts/, the configs) — do NOT add `!**/build` style
+# negations here: they also match `node_modules/better-sqlite3/build/`, which is
+# where the compiled `.node` lives, and the app then ships without its database.
+# The negations below are node_modules slimming only.
 files:
   - out/**
   - package.json
-  - "!**/{.eslintrc,.editorconfig,.prettierrc,.npmrc}"
-  - "!**/{.vscode,.idea,.github,tests,src,build}"
-  - "!**/*.{map,md,ts,tsx}"
-  - "!electron.vite.config.*"
-  - "!tsconfig*.json"
+  - "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme,test,__tests__,tests,powered-test,example,examples,.github}"
+  - "!**/node_modules/.bin"
+  - "!**/*.{o,a,obj,lib,map,ts,tsx}"
+  # better-sqlite3 compiles from a vendored amalgamation; the sources are ~10 MB
+  # and useless once build/Release/better_sqlite3.node exists.
+  - "!**/node_modules/better-sqlite3/{deps,src}${/*}"
+  - "!**/node_modules/better-sqlite3/build/{Release/obj,Release/obj.target,deps,*.mk,Makefile,*.gypi,config.gypi,binding.Makefile}${/*}"
 
 asar: true
-# Native modules (better-sqlite3 from P1 on) must live outside the asar archive.
+# better-sqlite3 is a native module: its .node binary cannot be loaded from
+# inside the asar archive, and neither can the loader that resolves it. Unpack
+# the whole package rather than just `**/*.node`, so bindings resolution finds
+# build/Release/ on disk where it expects it.
 asarUnpack:
   - resources/**
   - "**/*.node"
+  - "**/node_modules/better-sqlite3/**"
+
+# The native module is compiled against Electron's ABI at package time.
+# `npm install` does the same via the postinstall hook (scripts/native-deps.mjs,
+# which wraps `electron-builder install-app-deps` plus a @electron/rebuild cache
+# wipe that install-app-deps alone does not do).
+npmRebuild: true
+
+# Icons come from directories.buildResources: build/icon.png (1024²) feeds
+# Windows and macOS, build/icons/*.png feeds Linux. Regenerate them with
+# `node scripts/gen-icons.mjs`.
 
 win:
   target:
     - target: nsis
-      arch: [x64]
+      arch: [x64, arm64]
   artifactName: ${productName}-${version}-setup.${ext}
 
 nsis:
@@ -33,20 +58,29 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: always
   shortcutName: AMOS
+  uninstallDisplayName: AMOS
 
 mac:
   target:
+    # dmg to install by hand, zip because that is what auto-update consumes.
     - target: dmg
+      arch: [x64, arm64]
+    - target: zip
       arch: [x64, arm64]
   category: public.app-category.developer-tools
   artifactName: ${productName}-${version}-${arch}.${ext}
+  # AMOS drives the claude/codex CLIs as child processes; the hardened runtime
+  # kills that without these entitlements once the app is signed & notarised.
+  hardenedRuntime: true
+  entitlementsInherit: build/entitlements.mac.plist
 
 dmg:
   artifactName: ${productName}-${version}-${arch}.${ext}
 
+# `dir` only: an unpacked tree is enough to prove the packaging config on a
+# Linux box, and shipping AppImage/deb is not a v1 goal.
 linux:
   target:
     - dir
   category: Development
-
-npmRebuild: true
+  synopsis: Manage the agents, skills and MCP servers of your projects

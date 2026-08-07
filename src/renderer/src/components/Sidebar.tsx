@@ -26,9 +26,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { useConfirm } from "@/components/ui/confirm";
 import { CapabilityBadges, KIND_ICONS } from "@/components/CapabilityBadges";
 import { cn } from "@/lib/utils";
-import logoIcon from "@/assets/logo.png";
-import logoTitleBlack from "@/assets/logo_title_black.png";
-import logoTitleLight from "@/assets/logo_title_light.png";
+import { LogoMark, LogoWordmark } from "@/components/Logo";
 
 /**
  * The app rail. In this phase it holds a flat list of known projects; the
@@ -116,7 +114,7 @@ export function Sidebar() {
         style={{ width: SIDEBAR_RAIL }}
         className="flex h-full shrink-0 flex-col items-center gap-1 border-r border-sidebar-border bg-sidebar py-4 text-sidebar-foreground"
       >
-        <img src={logoIcon} alt="AMOS" className="mb-1 size-8" />
+        <LogoMark className="mb-1 size-8" />
         <div className="my-1 h-px w-6 bg-sidebar-border" />
         <Tooltip>
           <TooltipTrigger asChild>
@@ -222,16 +220,7 @@ export function Sidebar() {
     >
       {/* brand */}
       <div className="px-3 pt-4 pb-3">
-        <img
-          src={logoTitleBlack}
-          alt="AMOS"
-          className="h-12 w-full object-contain px-4 dark:hidden"
-        />
-        <img
-          src={logoTitleLight}
-          alt="AMOS"
-          className="hidden h-12 w-full object-contain px-4 dark:block"
-        />
+        <LogoWordmark className="px-4 py-1.5" />
       </div>
 
       {/* nav */}
