@@ -87,10 +87,14 @@ mac:
 dmg:
   artifactName: ${productName}-${version}-${arch}.${ext}
 
-# `dir` only: an unpacked tree is enough to prove the packaging config on a
-# Linux box, and shipping AppImage/deb is not a v1 goal.
+# AppImage is the one Linux format that runs everywhere without a package
+# manager, which is what CI publishes. `npx electron-builder --linux dir`
+# overrides this for a quick local check: the unpacked tree is enough to prove
+# the packaging config, and it skips downloading the AppImage runtime.
 linux:
   target:
-    - dir
+    - target: AppImage
+      arch: [x64]
   category: Development
   synopsis: Manage the agents, skills and MCP servers of your projects
+  artifactName: ${productName}-${version}-${arch}.${ext}

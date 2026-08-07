@@ -25,8 +25,17 @@ if (target !== "node" && target !== "electron") {
   process.exit(2);
 }
 
-const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-const npx = process.platform === "win32" ? "npx.cmd" : "npx";
+const isWindows = process.platform === "win32";
+const npm = isWindows ? "npm.cmd" : "npm";
+const npx = isWindows ? "npx.cmd" : "npx";
+
+// On Windows the launchers are batch files, and since Node 18.20.2 / 20.12.2 /
+// 22 `spawn` refuses to execute a `.cmd`/`.bat` without a shell (it fails with
+// EINVAL — the CVE-2024-27980 hardening). Go through cmd.exe there. Every
+// argument below is a hard-coded literal, so there is nothing to quote.
+function run(command, args) {
+  execFileSync(command, args, { cwd: root, stdio: "inherit", shell: isWindows });
+}
 
 // @electron/rebuild stamps the ABI it last built into this marker and skips the
 // module when it still matches — even though `npm rebuild` may have replaced
@@ -39,7 +48,7 @@ const forgeMeta = path.join(
 fs.rmSync(forgeMeta, { force: true });
 
 if (target === "node") {
-  execFileSync(npm, ["rebuild", "better-sqlite3"], { cwd: root, stdio: "inherit" });
+  run(npm, ["rebuild", "better-sqlite3"]);
   // Proof, since this script runs under plain Node. Opening a database is what
   // actually dlopens the addon — `require` alone loads it lazily and would
   // succeed against the wrong ABI.
@@ -47,6 +56,6 @@ if (target === "node") {
   new Database(":memory:").close();
   console.log("native deps: better-sqlite3 ready for Node");
 } else {
-  execFileSync(npx, ["electron-builder", "install-app-deps"], { cwd: root, stdio: "inherit" });
+  run(npx, ["electron-builder", "install-app-deps"]);
   console.log("native deps: better-sqlite3 ready for Electron");
 }

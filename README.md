@@ -79,19 +79,65 @@ npm run build        # typecheck + electron-vite build into out/
 
 ### Packaging
 
-`electron-builder.yml` produces an NSIS installer on Windows, a DMG + zip on
-macOS (x64 + arm64), and an unpacked directory on Linux. App icons are generated
-from `src/renderer/src/assets/logo.svg` by `node scripts/gen-icons.mjs`.
+`electron-builder.yml` produces an NSIS installer on Windows (one installer
+carrying x64 + arm64), a DMG + zip on macOS (x64 + arm64), and an AppImage on
+Linux. App icons are generated from `src/renderer/src/assets/logo.svg` by
+`node scripts/gen-icons.mjs`.
 
 ```bash
 npm run build
-npx electron-builder --linux dir     # unpacked tree in release/<version>/
-npx electron-builder --win nsis      # on Windows
+npx electron-builder --linux         # AppImage in release/<version>/
+npx electron-builder --linux dir     # faster: unpacked tree, no AppImage runtime
+npx electron-builder --win           # on Windows
 npx electron-builder --mac           # on macOS, for signing/notarisation
 ```
 
-Windows and macOS artifacts must be built (and signed) on their own OS; only the
-Linux `dir` target is exercised from a Linux box.
+Windows and macOS artifacts must be built (and signed) on their own OS; from a
+Linux box only the Linux targets are reachable.
+
+## CI & releases
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) has two jobs:
+
+| Job | Runs on | When | What |
+| --- | --- | --- | --- |
+| `test` | `ubuntu-latest` | every push to `main`, every PR, manual | `npm ci` · `npm run typecheck` · `npm test` |
+| `build` | `windows-latest`, `macos-latest`, `ubuntu-latest` | push to `main` and `workflow_dispatch`, after `test` passes | `npm ci` · `npm run build` · `electron-builder` |
+
+The `build` matrix uploads its installers with `actions/upload-artifact` — one
+artifact per OS (`amos-windows`, `amos-macos`, `amos-linux`), kept 14 days.
+Nothing is published to a release feed: `electron-builder` is always invoked with
+`--publish never`.
+
+Packaging is skipped on pull requests — forks cannot read secrets, and the PR
+signal that matters is the test job.
+
+### Signing secrets (all optional)
+
+With none of these configured the matrix still succeeds and simply produces
+**unsigned** artifacts: on macOS the workflow exports
+`CSC_IDENTITY_AUTO_DISCOVERY=false` so `electron-builder` does not go looking
+through the runner keychain, and on Windows an absent certificate just skips the
+signature. Add a secret and that platform starts signing, with no workflow edit.
+
+| Secret | Effect |
+| --- | --- |
+| `WIN_CSC_LINK` | Windows code-signing certificate (base64 `.pfx`, or an https URL). Enables Authenticode signing. |
+| `WIN_CSC_KEY_PASSWORD` | Password for the above. |
+| `MAC_CSC_LINK` | Apple *Developer ID Application* certificate (base64 `.p12`). Enables macOS signing. |
+| `MAC_CSC_KEY_PASSWORD` | Password for the above. |
+| `APPLE_ID` | Apple account used for notarisation. |
+| `APPLE_APP_SPECIFIC_PASSWORD` | App-specific password for that account. |
+| `APPLE_TEAM_ID` | Team the app is notarised under. |
+
+The three `APPLE_*` secrets are only exported alongside `MAC_CSC_LINK`:
+notarisation runs after a successful signature, and `electron-builder` rejects a
+half-filled set (an `APPLE_ID` without a team ID is a hard error). Set all three
+or none.
+
+`mac.hardenedRuntime` is on in `electron-builder.yml` with
+`build/entitlements.mac.plist`, which is what lets a signed AMOS keep spawning
+the `claude` / `codex` CLIs.
 
 ## Layout
 
