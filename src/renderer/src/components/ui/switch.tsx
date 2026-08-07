@@ -5,17 +5,25 @@ export function Switch({
   onCheckedChange,
   className,
   disabled,
+  // A wrapping <label> names a form control, not a <button role="switch">, so
+  // the name has to be passed in explicitly.
+  "aria-label": ariaLabel,
+  "aria-labelledby": ariaLabelledBy,
 }: {
   checked: boolean;
   onCheckedChange: (v: boolean) => void;
   className?: string;
   disabled?: boolean;
+  "aria-label"?: string;
+  "aria-labelledby"?: string;
 }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
+      aria-label={ariaLabel}
+      aria-labelledby={ariaLabelledBy}
       disabled={disabled}
       onClick={() => onCheckedChange(!checked)}
       className={cn(

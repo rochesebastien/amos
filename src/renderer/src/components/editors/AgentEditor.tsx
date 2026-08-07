@@ -198,6 +198,7 @@ export function AgentEditor({ projectId, item }: { projectId: string; item: Agen
         <Textarea
           value={form.body}
           onChange={(e) => set("body", e.target.value)}
+          aria-label={t("agent.instructions")}
           spellCheck={false}
           rows={18}
           className="font-mono text-[13px] leading-relaxed"

@@ -111,6 +111,7 @@ export function Sidebar() {
   if (collapsed) {
     return (
       <aside
+        aria-label={t("sidebar.label")}
         style={{ width: SIDEBAR_RAIL }}
         className="flex h-full shrink-0 flex-col items-center gap-1 border-r border-sidebar-border bg-sidebar py-4 text-sidebar-foreground"
       >
@@ -120,6 +121,7 @@ export function Sidebar() {
           <TooltipTrigger asChild>
             <Link
               to="/"
+              aria-label={t("nav.home")}
               className={cn(
                 "flex size-9 items-center justify-center rounded-lg transition-colors",
                 onHome
@@ -135,7 +137,9 @@ export function Sidebar() {
         <Tooltip>
           <TooltipTrigger asChild>
             <button
+              type="button"
               onClick={openFolder}
+              aria-label={t("sidebar.openFolder")}
               className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
             >
               <Plus className="size-4" />
@@ -145,12 +149,18 @@ export function Sidebar() {
         </Tooltip>
 
         <div className="my-1 h-px w-6 bg-sidebar-border" />
-        <div className="flex min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto">
+        <nav
+          aria-label={t("sidebar.projects")}
+          className="flex min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto"
+        >
           {sorted.map((p) => (
             <Tooltip key={p.id}>
               <TooltipTrigger asChild>
                 <button
+                  type="button"
                   onClick={() => void openProject(p)}
+                  aria-label={t("sidebar.openProject", { name: p.name })}
+                  aria-current={activeProjectId === p.id ? "page" : undefined}
                   className={cn(
                     "flex size-9 shrink-0 items-center justify-center rounded-lg transition-colors",
                     activeProjectId === p.id
@@ -168,12 +178,13 @@ export function Sidebar() {
               <TooltipContent side="right">{p.name}</TooltipContent>
             </Tooltip>
           ))}
-        </div>
+        </nav>
 
         <Tooltip>
           <TooltipTrigger asChild>
             <Link
               to="/settings/general"
+              aria-label={t("nav.settings")}
               className={cn(
                 "flex size-9 items-center justify-center rounded-lg transition-colors",
                 onSettings
@@ -189,7 +200,9 @@ export function Sidebar() {
         <Tooltip>
           <TooltipTrigger asChild>
             <button
+              type="button"
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              aria-label={t("nav.toggleTheme")}
               className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
             >
               {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
@@ -200,7 +213,9 @@ export function Sidebar() {
         <Tooltip>
           <TooltipTrigger asChild>
             <button
+              type="button"
               onClick={() => toggle()}
+              aria-label={t("nav.expandSidebar")}
               className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
             >
               <PanelLeftOpen className="size-4" />
@@ -215,6 +230,7 @@ export function Sidebar() {
   // ------------------------------------------------------------- expanded view
   return (
     <aside
+      aria-label={t("sidebar.label")}
       style={{ width }}
       className="relative flex h-full shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
     >
@@ -224,7 +240,7 @@ export function Sidebar() {
       </div>
 
       {/* nav */}
-      <nav className="flex flex-col gap-0.5 px-3 py-1.5">
+      <nav aria-label={t("nav.main")} className="flex flex-col gap-0.5 px-3 py-1.5">
         <Link
           to="/"
           className={cn(
@@ -240,7 +256,7 @@ export function Sidebar() {
       </nav>
 
       {/* projects */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 pt-2 pb-2">
+      <nav aria-label={t("sidebar.projects")} className="min-h-0 flex-1 overflow-y-auto px-2 pt-2 pb-2">
         <div className="flex items-center justify-between px-2 pb-1">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
             {t("sidebar.projects")}
@@ -249,7 +265,9 @@ export function Sidebar() {
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
+                  type="button"
                   onClick={openFolder}
+                  aria-label={t("sidebar.openFolder")}
                   className="flex size-5 items-center justify-center rounded text-muted-foreground/60 transition-colors hover:bg-sidebar-accent/60 hover:text-foreground"
                 >
                   <Plus className="size-3.5" />
@@ -261,7 +279,11 @@ export function Sidebar() {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
+                    type="button"
                     onClick={() => setSortOpen((o) => !o)}
+                    aria-label={t("sidebar.sort")}
+                    aria-haspopup="menu"
+                    aria-expanded={sortOpen}
                     className="flex size-5 items-center justify-center rounded text-muted-foreground/60 transition-colors hover:bg-sidebar-accent/60 hover:text-foreground"
                   >
                     <ArrowDownUp className="size-3.5" />
@@ -271,8 +293,19 @@ export function Sidebar() {
               </Tooltip>
               {sortOpen && (
                 <>
-                  <div className="fixed inset-0 z-10" onClick={() => setSortOpen(false)} />
-                  <div className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-lg border border-border bg-popover py-1 shadow-sm">
+                  <div
+                    aria-hidden
+                    className="fixed inset-0 z-10"
+                    onClick={() => setSortOpen(false)}
+                  />
+                  <div
+                    role="menu"
+                    aria-label={t("sidebar.sort")}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") setSortOpen(false);
+                    }}
+                    className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-lg border border-border bg-popover py-1 shadow-sm"
+                  >
                     {(
                       [
                         { key: "recent", label: t("sidebar.sortRecent") },
@@ -281,6 +314,9 @@ export function Sidebar() {
                     ).map((opt) => (
                       <button
                         key={opt.key}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={sort === opt.key}
                         onClick={() => {
                           setSort(opt.key);
                           setSortOpen(false);
@@ -313,7 +349,7 @@ export function Sidebar() {
             />
           ))}
         </div>
-      </div>
+      </nav>
 
       {/* foot */}
       <div className="flex items-center gap-1 border-t border-sidebar-border px-3 py-3">
@@ -332,7 +368,9 @@ export function Sidebar() {
         <Tooltip>
           <TooltipTrigger asChild>
             <button
+              type="button"
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              aria-label={t("nav.toggleTheme")}
               className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
             >
               {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
@@ -343,7 +381,9 @@ export function Sidebar() {
         <Tooltip>
           <TooltipTrigger asChild>
             <button
+              type="button"
               onClick={() => toggle()}
+              aria-label={t("nav.collapseSidebar")}
               className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
             >
               <PanelLeftClose className="size-4" />
@@ -353,8 +393,11 @@ export function Sidebar() {
         </Tooltip>
       </div>
 
-      {/* drag handle */}
+      {/* Drag handle. Mouse-only on purpose: collapsing and expanding the
+          sidebar is a labelled button above, so nothing here is keyboard-only
+          functionality — the handle is a pointer shortcut for the same thing. */}
       <div
+        aria-hidden
         onMouseDown={onDragStart}
         onDoubleClick={() => toggle()}
         title={t("nav.resizeHint")}
@@ -395,30 +438,39 @@ function ProjectRow({
 
   return (
     <div>
+      {/* The row is a container, not a control: the name is a real <button> so
+          it is reachable by keyboard, and the chevron and the delete action sit
+          next to it rather than nested inside another clickable element. */}
       <div
-        onClick={onOpen}
-        title={project.path}
         className={cn(
-          "group flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors",
+          "group flex items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors",
           active
             ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
             : "text-muted-foreground hover:bg-sidebar-accent/60",
         )}
       >
-        {active ? (
-          <FolderOpen className="size-3.5 shrink-0 text-primary" />
-        ) : (
-          <Folder className="size-3.5 shrink-0" />
-        )}
-        <span className="min-w-0 flex-1 truncate">{project.name}</span>
+        <button
+          type="button"
+          onClick={onOpen}
+          title={project.path}
+          aria-label={t("sidebar.openProject", { name: project.name })}
+          aria-current={active ? "page" : undefined}
+          className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {active ? (
+            <FolderOpen className="size-3.5 shrink-0 text-primary" />
+          ) : (
+            <Folder className="size-3.5 shrink-0" />
+          )}
+          <span className="min-w-0 flex-1 truncate">{project.name}</span>
+        </button>
         <Tooltip>
           <TooltipTrigger asChild>
             <button
+              type="button"
               aria-expanded={open}
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleExpanded(project.id);
-              }}
+              aria-label={t(open ? "sidebar.collapseProject" : "sidebar.expandProject")}
+              onClick={() => toggleExpanded(project.id)}
               className="shrink-0 rounded p-0.5 text-muted-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-foreground"
             >
               <ChevronRight
@@ -433,8 +485,10 @@ function ProjectRow({
         <Tooltip>
           <TooltipTrigger asChild>
             <button
+              type="button"
               onClick={onRemove}
-              className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:text-destructive group-hover:opacity-60"
+              aria-label={t("projects.remove")}
+              className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover:opacity-60"
             >
               <Trash2 className="size-3.5" />
             </button>
@@ -509,7 +563,8 @@ function CapabilitySection({
             <Link
               to="/p/$projectId/new/$kind"
               params={{ projectId, kind }}
-              className="ml-auto rounded p-0.5 opacity-0 transition-opacity hover:bg-sidebar-accent hover:text-foreground group-hover/section:opacity-100"
+              aria-label={t(`new.title.${kind}`)}
+              className="ml-auto rounded p-0.5 opacity-0 transition-opacity hover:bg-sidebar-accent hover:text-foreground focus-visible:opacity-100 group-hover/section:opacity-100"
             >
               <Plus className="size-3" />
             </Link>

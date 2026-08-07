@@ -92,25 +92,34 @@ export function WelcomeView() {
             <ul className="flex flex-col gap-1">
               {projects.map((p) => (
                 <li key={p.id}>
-                  <div
-                    onClick={() => void openRecent(p)}
-                    className="group flex cursor-pointer items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 transition-colors hover:bg-accent"
-                  >
-                    <FolderOpen className="size-4 shrink-0 text-primary" />
-                    <div className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate text-sm font-medium">{p.name}</span>
-                      <span className="truncate text-xs text-muted-foreground/70">{p.path}</span>
-                    </div>
-                    <span className="shrink-0 text-xs tabular-nums text-muted-foreground/60">
-                      {p.lastOpenedAt
-                        ? t("projects.lastOpened", { when: relativeTime(t, p.lastOpenedAt) })
-                        : t("projects.never")}
-                    </span>
+                  {/* The card is a container; the part that opens the project
+                      is a real button, so the row is keyboard-operable and the
+                      delete action is not nested inside another control. */}
+                  <div className="group flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 transition-colors hover:bg-accent">
+                    <button
+                      type="button"
+                      onClick={() => void openRecent(p)}
+                      aria-label={t("sidebar.openProject", { name: p.name })}
+                      className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <FolderOpen className="size-4 shrink-0 text-primary" />
+                      <div className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate text-sm font-medium">{p.name}</span>
+                        <span className="truncate text-xs text-muted-foreground/70">{p.path}</span>
+                      </div>
+                      <span className="shrink-0 text-xs tabular-nums text-muted-foreground/60">
+                        {p.lastOpenedAt
+                          ? t("projects.lastOpened", { when: relativeTime(t, p.lastOpenedAt) })
+                          : t("projects.never")}
+                      </span>
+                    </button>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button
+                          type="button"
                           onClick={(e) => void removeRecent(e, p)}
-                          className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-70"
+                          aria-label={t("projects.remove")}
+                          className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover:opacity-70"
                         >
                           <Trash2 className="size-4" />
                         </button>

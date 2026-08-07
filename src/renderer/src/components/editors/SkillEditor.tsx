@@ -134,7 +134,9 @@ export function SkillEditor({ projectId, item }: { projectId: string; item: Skil
       return (
         <div key={node.relativePath}>
           <button
+            type="button"
             style={pad}
+            aria-expanded={!isCollapsed}
             onClick={() =>
               setCollapsed((c) => {
                 const next = new Set(c);
@@ -165,7 +167,9 @@ export function SkillEditor({ projectId, item }: { projectId: string; item: Skil
     return (
       <button
         key={node.relativePath}
+        type="button"
         style={pad}
+        aria-current={active ? "true" : undefined}
         onClick={() => setSelected(node.absolutePath)}
         className={cn(
           "flex w-full items-center gap-1.5 rounded px-1 py-1 text-left text-[13px] transition-colors",
@@ -197,18 +201,22 @@ export function SkillEditor({ projectId, item }: { projectId: string; item: Skil
             </span>
             <div className="flex items-center gap-0.5">
               <button
+                type="button"
                 onClick={() => {
                   setCreating(true);
                   setCreateError(null);
                 }}
                 title={t("skill.newFile")}
+                aria-label={t("skill.newFile")}
                 className="rounded p-1 text-muted-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-foreground"
               >
                 <FilePlus2 className="size-3.5" />
               </button>
               <button
+                type="button"
                 onClick={() => void listing.refetch()}
                 title={t("skill.refresh")}
+                aria-label={t("skill.refresh")}
                 className="rounded p-1 text-muted-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-foreground"
               >
                 <RefreshCw className={cn("size-3.5", listing.isFetching && "animate-spin")} />
@@ -357,7 +365,7 @@ function FilePane({ projectId, path }: { projectId: string; path: string }) {
         <span className="min-w-0 flex-1 truncate font-mono">{path.split(/[/\\]/).pop()}</span>
         {dirty && <span className="shrink-0 text-muted-foreground/70">{t("cap.unsaved")}</span>}
       </div>
-      <div className="flex min-h-0 flex-1 rounded-b-xl border border-t-0 border-border">
+      <div className="flex min-h-0 flex-1 rounded-b-xl border border-t-0 border-border focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30">
         <div
           ref={gutterRef}
           aria-hidden
@@ -384,6 +392,7 @@ function FilePane({ projectId, path }: { projectId: string; path: string }) {
           }}
           spellCheck={false}
           wrap="off"
+          aria-label={t("instructions.editorLabel", { name: path.split(/[/\\]/).pop() ?? path })}
           className="min-h-[24rem] flex-1 resize-none overflow-auto whitespace-pre bg-transparent px-3 py-3 font-mono text-[12.5px] leading-[1.6] text-foreground outline-none"
         />
       </div>

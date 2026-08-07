@@ -25,6 +25,8 @@ export function GeneralSettings() {
           {themes.map(({ mode, labelKey, icon: Icon }) => (
             <button
               key={mode}
+              type="button"
+              aria-pressed={theme === mode}
               onClick={() => setTheme(mode)}
               className={cn(
                 "flex flex-col items-center gap-2 rounded-lg border p-4 transition-colors",

@@ -293,7 +293,7 @@ export function ChatView() {
                 ))}
               </MessageScrollerContent>
             </MessageScrollerViewport>
-            <MessageScrollerButton />
+            <MessageScrollerButton aria-label={t("chat.scrollToLatest")} />
           </MessageScroller>
         </MessageScrollerProvider>
       )}
@@ -316,6 +316,7 @@ export function ChatView() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onKeyDown}
               rows={1}
+              aria-label={t("chat.messageLabel")}
               placeholder={t("chat.sendPlaceholder")}
               className="max-h-48 min-h-[36px] flex-1 resize-none bg-transparent px-2 py-1.5 text-sm outline-none placeholder:text-muted-foreground"
             />
@@ -331,7 +332,12 @@ export function ChatView() {
             {streaming ? (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button size="icon" variant="secondary" onClick={stop}>
+                  <Button
+                    size="icon"
+                    variant="secondary"
+                    aria-label={t("chat.stop")}
+                    onClick={stop}
+                  >
                     <Square className="size-4" />
                   </Button>
                 </TooltipTrigger>
@@ -340,7 +346,12 @@ export function ChatView() {
             ) : (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button size="icon" onClick={() => void send()} disabled={!input.trim()}>
+                  <Button
+                    size="icon"
+                    aria-label={t("chat.send")}
+                    onClick={() => void send()}
+                    disabled={!input.trim()}
+                  >
                     <ArrowUp className="size-4" />
                   </Button>
                 </TooltipTrigger>
@@ -580,7 +591,7 @@ function ToolMarker({ tool }: { tool: StreamTool }) {
   return (
     <div className="w-full">
       <Marker asChild variant="border" role={running ? "status" : undefined} className="w-full">
-        <button type="button" onClick={() => setOpen((o) => !o)}>
+        <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
           <MarkerIcon>{running ? <Spinner /> : <Wrench />}</MarkerIcon>
           <MarkerContent
             className={cn(

@@ -71,6 +71,7 @@ export function BackendSettings() {
         <p className="mb-4 text-sm text-muted-foreground/70">{t("backends.echoHint")}</p>
         <label className="flex items-center gap-3 text-sm">
           <Switch
+            aria-label={t("backends.echoToggle")}
             checked={echo.data?.value === "1"}
             onCheckedChange={(checked) =>
               saveSetting.mutate({ key: ECHO_DRIVER_SETTING, value: checked ? "1" : "0" })

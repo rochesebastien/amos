@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useT } from "@/lib/i18n";
 import { Modal } from "./modal";
 import { Button } from "./button";
 
@@ -18,6 +19,7 @@ type ConfirmFn = (opts: ConfirmOptions) => Promise<boolean>;
 const ConfirmContext = React.createContext<ConfirmFn | null>(null);
 
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
+  const t = useT();
   const [state, setState] = React.useState<{
     opts: ConfirmOptions;
     resolve: (v: boolean) => void;
@@ -40,19 +42,19 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
       <Modal
         open={!!state}
         onClose={() => close(false)}
-        title={state?.opts.title ?? "Are you sure?"}
+        title={state?.opts.title ?? t("common.areYouSure")}
         description={state?.opts.description}
         className="max-w-sm"
         footer={
           <>
             <Button variant="ghost" onClick={() => close(false)}>
-              {state?.opts.cancelText ?? "Cancel"}
+              {state?.opts.cancelText ?? t("common.cancel")}
             </Button>
             <Button
               variant={state?.opts.destructive ? "destructive" : "primary"}
               onClick={() => close(true)}
             >
-              {state?.opts.confirmText ?? "Confirm"}
+              {state?.opts.confirmText ?? t("common.confirm")}
             </Button>
           </>
         }

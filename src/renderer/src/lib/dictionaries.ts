@@ -23,9 +23,12 @@ export const dict: Record<Lang, Record<string, string>> = {
     "common.close": "Close",
     "common.create": "Create",
     "common.loading": "Loading…",
+    "common.confirm": "Confirm",
+    "common.areYouSure": "Are you sure?",
 
     // nav
     "nav.home": "Home",
+    "nav.main": "Main navigation",
     "nav.settings": "Settings",
     "nav.toggleTheme": "Toggle theme",
     "nav.expandSidebar": "Expand sidebar",
@@ -33,9 +36,11 @@ export const dict: Record<Lang, Record<string, string>> = {
     "nav.resizeHint": "Drag to resize · double-click to collapse",
 
     // sidebar
+    "sidebar.label": "Sidebar",
     "sidebar.projects": "Projects",
     "sidebar.none": "No project yet",
     "sidebar.openFolder": "Open a folder",
+    "sidebar.openProject": "Open {name}",
     "sidebar.sort": "Sort projects",
     "sidebar.sortRecent": "Most recent",
     "sidebar.sortName": "Name (A–Z)",
@@ -296,6 +301,8 @@ export const dict: Record<Lang, Record<string, string>> = {
     "chat.emptyInProject":
       "The CLI runs in “{name}”, so it sees this project's agents, skills and MCP servers.",
     "chat.sendPlaceholder": "Send a message…",
+    "chat.messageLabel": "Message to send",
+    "chat.scrollToLatest": "Scroll to the latest message",
     "chat.stop": "Stop",
     "chat.stopped": "Stopped.",
     "chat.send": "Send",
@@ -326,17 +333,22 @@ export const dict: Record<Lang, Record<string, string>> = {
     "common.close": "Fermer",
     "common.create": "Créer",
     "common.loading": "Chargement…",
+    "common.confirm": "Confirmer",
+    "common.areYouSure": "Êtes-vous sûr ?",
 
     "nav.home": "Accueil",
+    "nav.main": "Navigation principale",
     "nav.settings": "Paramètres",
     "nav.toggleTheme": "Changer de thème",
     "nav.expandSidebar": "Déplier le panneau",
     "nav.collapseSidebar": "Replier le panneau",
     "nav.resizeHint": "Glisser pour redimensionner · double-clic pour replier",
 
+    "sidebar.label": "Panneau latéral",
     "sidebar.projects": "Projets",
     "sidebar.none": "Aucun projet pour l’instant",
     "sidebar.openFolder": "Ouvrir un dossier",
+    "sidebar.openProject": "Ouvrir {name}",
     "sidebar.sort": "Trier les projets",
     "sidebar.sortRecent": "Plus récents",
     "sidebar.sortName": "Nom (A–Z)",
@@ -595,6 +607,8 @@ export const dict: Record<Lang, Record<string, string>> = {
     "chat.emptyInProject":
       "Le CLI s’exécute dans « {name} » : il voit donc les agents, skills et serveurs MCP de ce projet.",
     "chat.sendPlaceholder": "Envoyer un message…",
+    "chat.messageLabel": "Message à envoyer",
+    "chat.scrollToLatest": "Aller au dernier message",
     "chat.stop": "Arrêter",
     "chat.stopped": "Arrêté.",
     "chat.send": "Envoyer",
