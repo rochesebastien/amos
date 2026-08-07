@@ -59,6 +59,18 @@ const amos: AmosApi = {
     saveAgent: (input) => invoke("cap:saveAgent", input),
     saveMcp: (input) => invoke("cap:saveMcp", input),
   },
+  cli: {
+    detect: (input) => invoke("cli:detect", input),
+    onChanged: (listener) => subscribe("cli:changed", listener),
+  },
+  chat: {
+    send: (input) => invoke("chat:send", input),
+    abort: (input) => invoke("chat:abort", input),
+    listSessions: (input) => invoke("chat:listSessions", input),
+    getSession: (input) => invoke("chat:getSession", input),
+    deleteSession: (input) => invoke("chat:deleteSession", input),
+    onEvent: (listener) => subscribe("chat:event", listener),
+  },
   settings: {
     get: (input) => invoke("settings:get", input),
     set: (input) => invoke("settings:set", input),

@@ -10,12 +10,37 @@ import type {
 } from "../shared/ipc.js";
 import { MCP_TRANSPORTS } from "../shared/capabilities.js";
 import {
+  CHAT_BACKENDS,
+  CLI_PATH_SETTING,
+  CLI_VENDORS,
+  ECHO_DRIVER_ENV,
+  ECHO_DRIVER_SETTING,
+  type ChatEventMessage,
+  type CliDetection,
+  type CliVendor,
+} from "../shared/chat.js";
+import {
   addProject,
   getProject,
   listProjects,
   removeProject,
   touchProject,
 } from "./services/projects.js";
+import {
+  deleteSession,
+  getSessionDetail,
+  listSessions,
+} from "./services/sessions.js";
+import {
+  cachedDetection,
+  clearAuthFailures,
+  detectClis,
+  detectionChanged,
+  ensurePathFixed,
+  markAuthFailure,
+  markAuthSuccess,
+} from "./chat/detect.js";
+import { ChatManager, createDriverFactory } from "./chat/manager.js";
 import { scanProject } from "./scanner/index.js";
 import { writeAgent, writeMcp, writeSkillMd } from "./scanner/writers.js";
 import { WatchManager } from "./scanner/watch.js";
@@ -86,6 +111,15 @@ const SaveMcpRequest = z.object({
   expectedMtimeMs: ExpectedMtime,
 });
 
+const DetectRequest = z.object({ refresh: z.boolean().optional() }).optional();
+const ChatSessionId = z.object({ sessionId: z.string().min(1).max(200) });
+const ChatSendRequest = z.object({
+  projectId: z.string().min(1),
+  sessionId: z.string().min(1).max(200).nullable().optional(),
+  backend: z.enum(CHAT_BACKENDS),
+  prompt: z.string().min(1).max(500_000),
+});
+
 /**
  * Register one handler with the payload schema applied and the response type
  * pinned to the shared contract.
@@ -115,16 +149,69 @@ async function allowPath(requested: string): Promise<string> {
 }
 
 let watchManager: WatchManager | null = null;
+let chatManager: ChatManager | null = null;
 
-/** Push a debounced filesystem change to every open window. */
-function broadcast(event: ScanChangedEvent): void {
+/** Push a payload to every open window. */
+function broadcast<C extends "scan:changed" | "chat:event" | "cli:changed">(
+  channel: C,
+  payload: C extends "scan:changed"
+    ? ScanChangedEvent
+    : C extends "chat:event"
+      ? ChatEventMessage
+      : CliDetection,
+): void {
   for (const win of BrowserWindow.getAllWindows()) {
-    if (!win.isDestroyed()) win.webContents.send("scan:changed", event);
+    if (!win.isDestroyed()) win.webContents.send(channel, payload);
   }
 }
 
+// ----- CLI detection ---------------------------------------------------------
+
+/** The manual binary paths and the echo flag, read fresh from the settings. */
+function detectOptions() {
+  const overrides: Partial<Record<CliVendor, string | null>> = {};
+  for (const vendor of CLI_VENDORS) {
+    overrides[vendor] = getSetting(CLI_PATH_SETTING[vendor]).value;
+  }
+  const echoEnabled =
+    getSetting(ECHO_DRIVER_SETTING).value === "1" || process.env[ECHO_DRIVER_ENV] === "1";
+  return { overrides, echoEnabled };
+}
+
+/** Probe the CLIs and push `cli:changed` when anything the UI shows moved. */
+async function refreshDetection(): Promise<CliDetection> {
+  const previous = cachedDetection();
+  const detection = await detectClis(detectOptions());
+  if (detectionChanged(previous, detection)) broadcast("cli:changed", detection);
+  return detection;
+}
+
+/** The detection a chat send uses: cached when we have one, probed when not. */
+async function currentDetection(): Promise<CliDetection> {
+  return cachedDetection() ?? (await refreshDetection());
+}
+
 export function registerIpcHandlers(): void {
-  watchManager = new WatchManager({ onChange: broadcast });
+  watchManager = new WatchManager({ onChange: (event) => broadcast("scan:changed", event) });
+  chatManager = new ChatManager({
+    emit: (message) => broadcast("chat:event", message),
+    resolveProjectPath: (projectId) => getProject(projectId)?.path ?? null,
+    createDriver: createDriverFactory({
+      detection: currentDetection,
+      log: (message) => console.warn(`[amos:chat] ${message}`),
+    }),
+    onAuthFailure: (vendor) => {
+      markAuthFailure(vendor);
+      void refreshDetection();
+    },
+    onAuthSuccess: (vendor) => {
+      markAuthSuccess(vendor);
+      void refreshDetection();
+    },
+  });
+
+  // Repair the PATH of a GUI-launched app before anything asks for a binary.
+  void ensurePathFixed().then(() => refreshDetection().catch(() => undefined));
 
   handle("app:ping", NoPayload, (): PingResult => {
     return { pong: true, version: app.getVersion(), platform: process.platform };
@@ -230,13 +317,49 @@ export function registerIpcHandlers(): void {
     };
   });
 
+  // ----- chat ---------------------------------------------------------------
+
+  handle("cli:detect", DetectRequest, async (input) => {
+    // "Check again" also forgets the auth failures we concluded from a turn:
+    // the user has just been told to log in, and may well have done it.
+    if (input?.refresh) clearAuthFailures();
+    return await refreshDetection();
+  });
+
+  handle("chat:send", ChatSendRequest, async (input) => {
+    if (!chatManager) throw new Error("Chat is not available.");
+    return await chatManager.send(input);
+  });
+
+  handle("chat:abort", ChatSessionId, (input) => {
+    return chatManager?.abort(input.sessionId) ?? ({ ok: true } as const);
+  });
+
+  handle("chat:listSessions", ScanRequest, (input) => listSessions(input.projectId));
+  handle("chat:getSession", ChatSessionId, (input) => getSessionDetail(input.sessionId));
+  handle("chat:deleteSession", ChatSessionId, (input) => {
+    chatManager?.abort(input.sessionId);
+    return deleteSession(input.sessionId);
+  });
+
   handle("settings:get", SettingKey, (input) => getSetting(input.key));
-  handle("settings:set", SettingEntry, (input) => setSetting(input.key, input.value));
+  handle("settings:set", SettingEntry, async (input) => {
+    const result = setSetting(input.key, input.value);
+    // A changed binary path or echo flag has to reach the UI as a new
+    // detection, not as a setting nobody re-reads.
+    const affectsClis =
+      input.key === ECHO_DRIVER_SETTING ||
+      CLI_VENDORS.some((vendor) => CLI_PATH_SETTING[vendor] === input.key);
+    if (affectsClis) await refreshDetection().catch(() => undefined);
+    return result;
+  });
 }
 
-/** Tear the watchers down on quit so no inotify handle outlives the app. */
+/** Tear the watchers and the chat drivers down on quit. */
 export async function disposeIpcHandlers(): Promise<void> {
-  const manager = watchManager;
+  const watchers = watchManager;
+  const chat = chatManager;
   watchManager = null;
-  await manager?.closeAll();
+  chatManager = null;
+  await Promise.all([watchers?.closeAll(), chat?.dispose()]);
 }

@@ -1,5 +1,5 @@
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
-import { AlertTriangle, FileText, FolderOpen, Plus, RefreshCw } from "lucide-react";
+import { AlertTriangle, FileText, FolderOpen, MessageSquare, Plus, RefreshCw } from "lucide-react";
 import {
   countItems,
   ECOSYSTEMS,
@@ -73,6 +73,14 @@ export function ProjectView() {
             {scan && ` · ${t("project.scannedAt", { when: relativeTime(t, scan.scannedAt) })}`}
           </p>
         </div>
+        <Link
+          to="/p/$projectId/chat"
+          params={{ projectId }}
+          className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-[filter] hover:brightness-105"
+        >
+          <MessageSquare className="size-4" />
+          {t("chat.title")}
+        </Link>
         <Button
           variant="outline"
           onClick={() => void scanQuery.refetch()}

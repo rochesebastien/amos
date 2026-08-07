@@ -24,10 +24,5 @@
     },
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.web.tsbuildinfo"
   },
-  "include": ["src/renderer/src", "src/shared"],
-  // `legacy/` holds the CheveluAI chat view and its composer, kept verbatim
-  // until the chat phase refits them onto the IPC transport. They still import
-  // the deleted HTTP client, so they are not part of the app (nor of the build
-  // graph — nothing imports them) until then.
-  "exclude": ["src/renderer/src/legacy"]
+  "include": ["src/renderer/src", "src/shared"]
 }

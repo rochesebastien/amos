@@ -9,12 +9,15 @@ import {
 } from "@tanstack/react-router";
 import { Sidebar } from "@/components/Sidebar";
 import { ScanSync } from "@/components/ScanSync";
+import { ChatSync } from "@/components/ChatSync";
 import { SettingsLayout } from "@/views/settings/SettingsLayout";
 import { WelcomeView } from "@/views/WelcomeView";
 import { ProjectView } from "@/views/ProjectView";
 import { ItemView } from "@/views/ItemView";
 import { NewItemView } from "@/views/NewItemView";
+import { ChatView } from "@/views/ChatView";
 import { GeneralSettings } from "@/views/settings/GeneralSettings";
+import { BackendSettings } from "@/views/settings/BackendSettings";
 
 function RootShell() {
   // On /settings the dedicated settings sidebar replaces the main app sidebar.
@@ -24,6 +27,7 @@ function RootShell() {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
       <ScanSync />
+      <ChatSync />
       {!onSettings && <Sidebar />}
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Outlet />
@@ -41,11 +45,25 @@ const welcomeRoute = createRoute({
   component: WelcomeView,
 });
 
-/** Project overview. The chat route joins these in a later phase. */
+/** Project overview. */
 const projectRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/p/$projectId",
   component: ProjectView,
+});
+
+/** A new chat in this project. */
+const chatRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/p/$projectId/chat",
+  component: ChatView,
+});
+
+/** One saved conversation of this project. */
+const chatSessionRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/p/$projectId/chat/$sessionId",
+  component: ChatView,
 });
 
 /** Editor for one agent / skill / MCP server of a project. */
@@ -84,12 +102,20 @@ const generalSettingsRoute = createRoute({
   component: GeneralSettings,
 });
 
+const backendsSettingsRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: "backends",
+  component: BackendSettings,
+});
+
 const routeTree = rootRoute.addChildren([
   welcomeRoute,
   projectRoute,
+  chatRoute,
+  chatSessionRoute,
   itemRoute,
   newItemRoute,
-  settingsRoute.addChildren([settingsIndexRoute, generalSettingsRoute]),
+  settingsRoute.addChildren([settingsIndexRoute, generalSettingsRoute, backendsSettingsRoute]),
 ]);
 
 // Hash history: the packaged app is served from `file://`, where path-based

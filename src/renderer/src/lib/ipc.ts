@@ -15,6 +15,13 @@ import type {
   WriteFileResult,
 } from "@shared/ipc";
 import type { ProjectScan } from "@shared/capabilities";
+import type {
+  ChatBackend,
+  ChatEventMessage,
+  ChatSession,
+  ChatSessionDetail,
+  CliDetection,
+} from "@shared/chat";
 
 export type {
   Project,
@@ -26,6 +33,11 @@ export type {
   ListDirResult,
   SaveCapabilityResult,
   ScanChangedEvent,
+  ChatBackend,
+  ChatEventMessage,
+  ChatSession,
+  ChatSessionDetail,
+  CliDetection,
 };
 
 /**
@@ -66,6 +78,24 @@ export const ipc = {
 
   saveAgent: (input: SaveAgentRequest) => bridge().cap.saveAgent(input),
   saveMcp: (input: SaveMcpRequest) => bridge().cap.saveMcp(input),
+
+  /** Locate the vendor CLIs. `refresh` also forgets remembered auth failures. */
+  detectClis: (refresh = false) => bridge().cli.detect({ refresh }),
+  /** Subscribe to detection changes; the return value unsubscribes. */
+  onCliChanged: (listener: (detection: CliDetection) => void) => bridge().cli.onChanged(listener),
+
+  sendChat: (input: {
+    projectId: string;
+    sessionId?: string | null;
+    backend: ChatBackend;
+    prompt: string;
+  }) => bridge().chat.send(input),
+  abortChat: (sessionId: string) => bridge().chat.abort({ sessionId }),
+  listChatSessions: (projectId: string) => bridge().chat.listSessions({ projectId }),
+  getChatSession: (sessionId: string) => bridge().chat.getSession({ sessionId }),
+  deleteChatSession: (sessionId: string) => bridge().chat.deleteSession({ sessionId }),
+  /** Subscribe to streaming chat events; the return value unsubscribes. */
+  onChatEvent: (listener: (message: ChatEventMessage) => void) => bridge().chat.onEvent(listener),
 
   getSetting: (key: string) => bridge().settings.get({ key }),
   setSetting: (key: string, value: string) => bridge().settings.set({ key, value }),

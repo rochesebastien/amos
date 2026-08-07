@@ -1,12 +1,12 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { ArrowLeft, SlidersHorizontal } from "lucide-react";
+import { ArrowLeft, SlidersHorizontal, Terminal } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import logoIcon from "@/assets/logo.png";
 
-// The Backends section joins this list once the chat drivers land.
 const SECTIONS = [
   { to: "/settings/general", labelKey: "settings.general", icon: SlidersHorizontal },
+  { to: "/settings/backends", labelKey: "settings.backends", icon: Terminal },
 ] as const;
 
 export function SettingsLayout() {

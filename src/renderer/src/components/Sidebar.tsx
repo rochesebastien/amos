@@ -13,6 +13,7 @@ import {
   ArrowDownUp,
   Check,
   ChevronRight,
+  MessageSquare,
   Plus,
 } from "lucide-react";
 import { itemsOfKind, type CapabilityKind } from "@shared/capabilities";
@@ -455,6 +456,17 @@ function ProjectRow({
 
       {open && (
         <div className="my-0.5 ml-3.5 border-l border-sidebar-border pl-1.5">
+          <Link
+            to="/p/$projectId/chat"
+            params={{ projectId: project.id }}
+            className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px] text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
+            activeProps={{
+              className: "bg-sidebar-accent font-semibold text-sidebar-accent-foreground",
+            }}
+          >
+            <MessageSquare className="size-3" />
+            <span className="min-w-0 flex-1 truncate">{t("chat.title")}</span>
+          </Link>
           {isPending && (
             <p className="px-2 py-1 text-[12px] text-muted-foreground/60">
               {t("sidebar.scanning")}

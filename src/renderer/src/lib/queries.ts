@@ -19,6 +19,9 @@ export const qk = {
   setting: (key: string) => ["setting", key] as const,
   file: (path: string) => ["file", path] as const,
   dir: (path: string) => ["dir", path] as const,
+  clis: ["clis"] as const,
+  chatSessions: (projectId: string) => ["chat", "sessions", projectId] as const,
+  chatSession: (sessionId: string) => ["chat", "session", sessionId] as const,
 };
 
 // ----- Queries --------------------------------------------------------------
@@ -136,6 +139,57 @@ export function useWriteFile(projectId: string) {
     mutationFn: (input: { path: string; content: string; expectedMtimeMs?: number | null }) =>
       ipc.writeFile(input),
     onSuccess: (result) => invalidate(result.path),
+  });
+}
+
+// ----- Chat -----------------------------------------------------------------
+
+/**
+ * Which vendor CLIs are installed and usable. Kept fresh by the `cli:changed`
+ * push rather than by polling — the main process is the one that knows when a
+ * turn failed to authenticate.
+ */
+export function useCliDetection() {
+  return useQuery({
+    queryKey: qk.clis,
+    queryFn: () => ipc.detectClis(false),
+    staleTime: 60_000,
+  });
+}
+
+/** Re-probe the CLIs, forgetting what a failed turn concluded about auth. */
+export function useRecheckClis() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => ipc.detectClis(true),
+    onSuccess: (detection) => qc.setQueryData(qk.clis, detection),
+  });
+}
+
+export function useChatSessions(projectId: string | null | undefined) {
+  return useQuery({
+    queryKey: qk.chatSessions(projectId ?? ""),
+    queryFn: () => ipc.listChatSessions(projectId!),
+    enabled: Boolean(projectId),
+    staleTime: 2_000,
+  });
+}
+
+/** One session with its transcript. Live tokens come from the stream store. */
+export function useChatSession(sessionId: string | null | undefined) {
+  return useQuery({
+    queryKey: qk.chatSession(sessionId ?? ""),
+    queryFn: () => ipc.getChatSession(sessionId!),
+    enabled: Boolean(sessionId),
+    staleTime: 0,
+  });
+}
+
+export function useDeleteChatSession(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (sessionId: string) => ipc.deleteChatSession(sessionId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.chatSessions(projectId) }),
   });
 }
 

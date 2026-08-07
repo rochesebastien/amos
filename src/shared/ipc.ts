@@ -8,6 +8,13 @@
  */
 
 import type { McpTransport, ProjectScan } from "./capabilities.js";
+import type {
+  ChatBackend,
+  ChatEventMessage,
+  ChatSession,
+  ChatSessionDetail,
+  CliDetection,
+} from "./chat.js";
 
 // ---------------------------------------------------------------- data model
 
@@ -210,6 +217,35 @@ export type IpcInvokeMap = {
   /** Write one MCP server entry, preserving the rest of the config file. */
   "cap:saveMcp": { request: SaveMcpRequest; response: SaveCapabilityResult };
 
+  /**
+   * Locate the vendor CLIs and report how usable they look. `refresh` forces
+   * a fresh probe and clears the remembered auth failures — it is what the
+   * "check again" button on the setup screen calls.
+   */
+  "cli:detect": { request: { refresh?: boolean } | undefined; response: CliDetection };
+
+  /**
+   * Start a turn. Resolves as soon as the session exists; everything the user
+   * reads arrives on the `chat:event` push.
+   */
+  "chat:send": {
+    request: {
+      projectId: string;
+      sessionId?: string | null;
+      backend: ChatBackend;
+      prompt: string;
+    };
+    response: { sessionId: string };
+  };
+  /** Stop the running turn of a session. A no-op when nothing is running. */
+  "chat:abort": { request: { sessionId: string }; response: { ok: true } };
+  /** Sessions of one project, most recently used first. */
+  "chat:listSessions": { request: { projectId: string }; response: ChatSession[] };
+  /** One session with its full transcript, or `null` when it is gone. */
+  "chat:getSession": { request: { sessionId: string }; response: ChatSessionDetail | null };
+  /** Delete a session and its messages. */
+  "chat:deleteSession": { request: { sessionId: string }; response: { ok: true } };
+
   /** Read one persisted setting. */
   "settings:get": { request: { key: string }; response: SettingValue };
   /** Write one persisted setting. */
@@ -237,6 +273,12 @@ export const IPC_CHANNELS = [
   "fs:listDir",
   "cap:saveAgent",
   "cap:saveMcp",
+  "cli:detect",
+  "chat:send",
+  "chat:abort",
+  "chat:listSessions",
+  "chat:getSession",
+  "chat:deleteSession",
   "settings:get",
   "settings:set",
 ] as const satisfies readonly IpcChannel[];
@@ -244,6 +286,10 @@ export const IPC_CHANNELS = [
 /** Main → renderer push channels (subscriptions). */
 export type IpcEventMap = {
   "scan:changed": ScanChangedEvent;
+  /** One event of a streaming turn. */
+  "chat:event": ChatEventMessage;
+  /** CLI detection changed — a binary appeared, or an auth error landed. */
+  "cli:changed": CliDetection;
 };
 
 export type IpcEventChannel = keyof IpcEventMap;
@@ -281,6 +327,25 @@ export type AmosApi = {
   cap: {
     saveAgent(input: SaveAgentRequest): Promise<SaveCapabilityResult>;
     saveMcp(input: SaveMcpRequest): Promise<SaveCapabilityResult>;
+  };
+  cli: {
+    detect(input?: { refresh?: boolean }): Promise<CliDetection>;
+    /** Subscribe to detection changes; returns an unsubscribe. */
+    onChanged(listener: (detection: CliDetection) => void): () => void;
+  };
+  chat: {
+    send(input: {
+      projectId: string;
+      sessionId?: string | null;
+      backend: ChatBackend;
+      prompt: string;
+    }): Promise<{ sessionId: string }>;
+    abort(input: { sessionId: string }): Promise<{ ok: true }>;
+    listSessions(input: { projectId: string }): Promise<ChatSession[]>;
+    getSession(input: { sessionId: string }): Promise<ChatSessionDetail | null>;
+    deleteSession(input: { sessionId: string }): Promise<{ ok: true }>;
+    /** Subscribe to streaming chat events; returns an unsubscribe. */
+    onEvent(listener: (message: ChatEventMessage) => void): () => void;
   };
   settings: {
     get(input: { key: string }): Promise<SettingValue>;
