@@ -13,6 +13,15 @@ import type { ChatDriver, ChatDriverResult, ChatDriverSendInput } from "./types.
  * (that is where the CLI keeps the credentials it already has). The child
  * therefore inherits `process.env` untouched, minus the one Electron variable
  * that would make a Node-based CLI misbehave.
+ *
+ * A third rule is load-bearing for packaging: `pathToClaudeCodeExecutable` is
+ * never optional. Left out, the SDK falls back to the `claude` binary vendored
+ * in its `@anthropic-ai/claude-agent-sdk-<platform>` optional dependency — 280
+ * MB that AMOS deliberately does not ship (see electron-builder.yml). So a
+ * driver built without a path refuses the turn here, with a message that names
+ * the real fix, rather than reaching `query()` and surfacing the SDK's own
+ * "reinstall the SDK without --omit=optional" advice, which is meaningless to
+ * someone using AMOS.
  */
 
 /** `ELECTRON_RUN_AS_NODE` leaks into children and confuses Node-based CLIs. */
@@ -23,17 +32,36 @@ function childEnv(): Record<string, string | undefined> {
 }
 
 export type ClaudeDriverOptions = {
-  /** Absolute path of the `claude` binary, from detection or the settings. */
+  /**
+   * Absolute path of the `claude` binary, from detection or the settings.
+   * `null` is representable so the refusal below is a real runtime guard and
+   * not just a type assertion: the value comes from detection, which can go
+   * stale between building the driver and running a turn.
+   */
   binaryPath: string | null;
   /** Model id to pass through, or `null` for the CLI's own default. */
   model?: string | null;
 };
 
+/** Shown instead of a turn when no `claude` binary is known. */
+export const CLAUDE_BINARY_REQUIRED =
+  "AMOS does not bundle a claude binary. Install the Claude Code CLI and sign in, " +
+  "then set its path in Settings → Backends if AMOS still cannot find it.";
+
 export function createClaudeDriver(options: ClaudeDriverOptions): ChatDriver {
+  const binaryPath = options.binaryPath?.trim() || null;
+
   return {
     backend: "claude",
 
     async send(input: ChatDriverSendInput): Promise<ChatDriverResult> {
+      // Before anything else: no path, no `query()`. Calling the SDK here would
+      // make it look for a binary AMOS does not ship.
+      if (!binaryPath) {
+        input.onEvent({ type: "error", error: CLAUDE_BINARY_REQUIRED, code: "cli_missing" });
+        return { resumeToken: null, aborted: false };
+      }
+
       const mapper = createClaudeMapper();
       const abortController = new AbortController();
       const forwardAbort = () => abortController.abort();
@@ -48,7 +76,7 @@ export function createClaudeDriver(options: ClaudeDriverOptions): ChatDriver {
         // The project's own CLAUDE.md, agents, skills and MCP servers are the
         // whole point of AMOS: load every settings source, like the CLI does.
         settingSources: ["user", "project", "local"],
-        ...(options.binaryPath ? { pathToClaudeCodeExecutable: options.binaryPath } : {}),
+        pathToClaudeCodeExecutable: binaryPath,
         ...(options.model ? { model: options.model } : {}),
         ...(input.resumeToken ? { resume: input.resumeToken } : {}),
       };

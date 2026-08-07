@@ -58,6 +58,15 @@ installed, the chat is gated behind a setup screen that tells you what to instal
   shell's `PATH`, you can point it at a binary by hand in **Settings →
   Backends**.
 
+**AMOS ships no CLI of its own.** It never bundles, downloads or updates a
+`claude` or `codex` binary — it drives *your* installation, on *your*
+subscription, which is the only way the Pro/Max plan and your existing login can
+carry over. `@anthropic-ai/claude-agent-sdk` can vendor its own copy of `claude`
+as an optional platform package; AMOS excludes that from the build (see
+[Packaging](#packaging)) and always hands the SDK the path detection found. With
+neither CLI installed, chat is gated behind a setup screen and the rest of the
+app keeps working.
+
 ## Development
 
 ```bash
@@ -94,6 +103,19 @@ npx electron-builder --mac           # on macOS, for signing/notarisation
 
 Windows and macOS artifacts must be built (and signed) on their own OS; from a
 Linux box only the Linux targets are reachable.
+
+The `files:` list in `electron-builder.yml` drops
+`@anthropic-ai/claude-agent-sdk-<platform>` — the optional dependency in which
+the SDK vendors a complete `claude` binary. It is ~280 MB per platform (the
+unpacked Linux tree goes from 866 MB to 306 MB, because a Linux `npm install`
+picks up both the glibc and the musl package), it is only ever reached when
+`pathToClaudeCodeExecutable` is absent, and AMOS never leaves it absent:
+`chat/manager.ts` refuses to build a
+driver unless detection found your CLI, and `chat/claudeDriver.ts` refuses the
+turn if it was somehow built without a path. Keeping it would also ship the
+*build host's* binary — npm installs only that platform's optional package — so
+a cross-built artifact would carry the wrong one. `tests/main/packaging.test.ts`
+guards both halves of that argument.
 
 ## CI & releases
 

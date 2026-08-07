@@ -29,12 +29,27 @@ files:
   # that vendors a whole `claude` binary, and it is the SDK's fallback only when
   # `pathToClaudeCodeExecutable` is absent. AMOS always supplies it: the chat
   # manager refuses to build a driver unless detection found the user's own CLI
-  # (chat/manager.ts — `if (!status.installed || !status.path) …`), so the
-  # vendored copy is unreachable. Worse, npm only installs the optional package
+  # (chat/manager.ts — `if (!status.installed || !status.path) …`) and the driver
+  # itself refuses the turn if it was somehow built without a path
+  # (chat/claudeDriver.ts — CLAUDE_BINARY_REQUIRED), so the vendored copy is
+  # unreachable by construction. Worse, npm only installs the optional package
   # for the *build host*, so keeping it would ship the wrong platform's binary
   # on a cross-built Windows or macOS artifact. Verified by packaging without it
   # and running a real `claude` turn from the unpacked app.
+  # The glob is anchored on the scope and on the trailing `-`: the SDK proper is
+  # `@anthropic-ai/claude-agent-sdk` (no hyphen) and stays. Do NOT loosen this
+  # into a bare `!**/claude-agent-sdk-*` — see the P5 lesson above.
   - "!**/node_modules/@anthropic-ai/claude-agent-sdk-*${/*}"
+  # The SDK also ships subpath entry points AMOS never imports. `browser-sdk.js`
+  # (1.2 MB) is the `./browser` export: a build for browser environments, which
+  # by definition cannot spawn a CLI, so the Electron main process can never
+  # want it. Nothing in `sdk.mjs` references it either — its only dynamic
+  # imports are `node:fs`, `node:path` and `node:buffer`. Confirmed by deleting
+  # it and running a real turn. `bridge.mjs` (1.1 MB) is left in place: equally
+  # unimported today, but it backs SDK features (in-process MCP servers, the
+  # remote-control bridge) a future AMOS could reach for, and 1.1 MB out of a
+  # 306 MB tree is not worth that bet.
+  - "!**/node_modules/@anthropic-ai/claude-agent-sdk/browser-sdk.js"
 
 asar: true
 # better-sqlite3 is a native module: its .node binary cannot be loaded from
