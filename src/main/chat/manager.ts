@@ -1,6 +1,7 @@
 import {
   isCliVendor,
   type ChatBackend,
+  type ChatErrorCode,
   type ChatEvent,
   type ChatEventMessage,
   type ChatToolCall,
@@ -47,6 +48,13 @@ export type ChatManagerOptions = {
   resolveProjectPath: (projectId: string) => string | null;
   /** Build the driver for a backend. Injected so tests need no CLI. */
   createDriver: (backend: ChatBackend) => Promise<ChatDriver>;
+  /**
+   * What a driver for this backend would be built from — the binary path, in
+   * practice. A cached driver whose key no longer matches is disposed and
+   * rebuilt, which is how a Settings path change takes effect without a
+   * restart. Omitted (in tests), drivers are cached for the manager's life.
+   */
+  driverKey?: (backend: ChatBackend) => Promise<string>;
   /** Database handle; defaults to the process-wide one at call time. */
   db?: Db;
   onAuthFailure?: (vendor: CliVendor) => void;
@@ -58,9 +66,24 @@ type Run = {
   messageId: string;
 };
 
+/** A driver construction failure that already knows how to classify itself. */
+export class ChatDriverError extends Error {
+  constructor(
+    message: string,
+    readonly code: ChatErrorCode,
+  ) {
+    super(message);
+    this.name = "ChatDriverError";
+  }
+}
+
+function errorCodeOf(failure: unknown): ChatErrorCode {
+  return failure instanceof ChatDriverError ? failure.code : "unknown";
+}
+
 export class ChatManager {
   private readonly runs = new Map<string, Run>();
-  private readonly drivers = new Map<ChatBackend, ChatDriver>();
+  private readonly drivers = new Map<ChatBackend, { driver: ChatDriver; key: string }>();
 
   constructor(private readonly options: ChatManagerOptions) {}
 
@@ -153,7 +176,7 @@ export class ChatManager {
     this.runs.clear();
     const drivers = [...this.drivers.values()];
     this.drivers.clear();
-    await Promise.all(drivers.map((driver) => driver.dispose().catch(() => undefined)));
+    await Promise.all(drivers.map(({ driver }) => driver.dispose().catch(() => undefined)));
   }
 
   // ------------------------------------------------------------------ private
@@ -167,10 +190,19 @@ export class ChatManager {
   }
 
   private async driverFor(backend: ChatBackend): Promise<ChatDriver> {
+    const key = (await this.options.driverKey?.(backend)) ?? "static";
     const existing = this.drivers.get(backend);
-    if (existing) return existing;
+    if (existing?.key === key) return existing.driver;
+    // The binary this backend resolves to has changed (or the driver has never
+    // been built). Only the codex driver owns a child process, and rebuilding
+    // it is safe: the resume token is persisted per session, so a fresh
+    // app-server picks the conversation back up.
+    if (existing) {
+      this.drivers.delete(backend);
+      await existing.driver.dispose().catch(() => undefined);
+    }
     const driver = await this.options.createDriver(backend);
-    this.drivers.set(backend, driver);
+    this.drivers.set(backend, { driver, key });
     return driver;
   }
 
@@ -243,7 +275,7 @@ export class ChatManager {
       onEvent({
         type: "error",
         error: failure instanceof Error ? failure.message : String(failure),
-        code: "unknown",
+        code: errorCodeOf(failure),
       });
     } finally {
       if (context.controller.signal.aborted) aborted = true;
@@ -285,7 +317,10 @@ export function createDriverFactory(deps: DriverFactoryDeps) {
     if (backend === "echo") {
       const detection = await deps.detection();
       if (!detection.echoEnabled) {
-        throw new Error("The echo driver is switched off in Settings → Backends.");
+        throw new ChatDriverError(
+          "The echo driver is switched off in Settings → Backends.",
+          "cli_missing",
+        );
       }
       return createEchoDriver();
     }
@@ -293,11 +328,26 @@ export function createDriverFactory(deps: DriverFactoryDeps) {
     const detection = await deps.detection();
     const status = detection.clis[backend];
     if (!status.installed || !status.path) {
-      throw new Error(
+      throw new ChatDriverError(
         `The ${backend} CLI was not found. Install it, or set its path in Settings → Backends.`,
+        "cli_missing",
       );
     }
     if (backend === "claude") return createClaudeDriver({ binaryPath: status.path });
     return createCodexDriver({ binaryPath: status.path, log: deps.log });
+  };
+}
+
+/**
+ * The companion key: everything `createDriverFactory` bakes into a driver
+ * instance. When the key a driver was cached under stops matching, the manager
+ * rebuilds it — so a new binary path set in Settings takes effect on the very
+ * next turn instead of the next launch.
+ */
+export function createDriverKey(deps: DriverFactoryDeps) {
+  return async (backend: ChatBackend): Promise<string> => {
+    const detection = await deps.detection();
+    if (backend === "echo") return `echo:${detection.echoEnabled ? "on" : "off"}`;
+    return `${backend}:${detection.clis[backend].path ?? "missing"}`;
   };
 }

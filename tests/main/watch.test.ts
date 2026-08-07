@@ -129,6 +129,30 @@ describe("WatchManager", () => {
     expect(events[0]!.projectId).toBe("p1");
   });
 
+  it("reports edits to nested instruction files a scan handed over", async () => {
+    const nested = path.join(project, "packages", "api", "AGENTS.md");
+    await fs.mkdir(path.dirname(nested), { recursive: true });
+    await fs.writeFile(nested, "# api rules\n");
+
+    manager.watch("p1", project);
+    // What the scan:project handler does after each scan: the exact nested
+    // paths it found, nothing else.
+    manager.setExtraFiles("p1", [nested]);
+    await new Promise((r) => setTimeout(r, 300));
+
+    await fs.writeFile(nested, "# api rules, edited elsewhere\n");
+    await waitFor(() => events.length > 0);
+    expect(events[0]!.projectId).toBe("p1");
+
+    // Dropped from the next scan's list: edits stop being reported.
+    manager.setExtraFiles("p1", []);
+    await new Promise((r) => setTimeout(r, 300));
+    events.length = 0;
+    await fs.writeFile(nested, "# edited again\n");
+    await settle();
+    expect(events).toEqual([]);
+  });
+
   it("says nothing about the rest of the project root", async () => {
     manager.watch("p1", project);
     await new Promise((r) => setTimeout(r, 300));

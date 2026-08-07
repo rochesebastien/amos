@@ -11,7 +11,7 @@ import {
   listSessions,
   titleFromPrompt,
 } from "../../src/main/services/sessions.js";
-import { ChatManager } from "../../src/main/chat/manager.js";
+import { ChatManager, createDriverFactory } from "../../src/main/chat/manager.js";
 import { createEchoDriver } from "../../src/main/chat/echoDriver.js";
 import type { ChatDriver } from "../../src/main/chat/types.js";
 import type { ChatEventMessage } from "../../src/shared/chat.js";
@@ -250,6 +250,10 @@ describe("chat manager · echo driver", () => {
       resolveProjectPath: () => project.path,
       createDriver: async () => spy,
     });
+    // The first turn's `done` is already in `events`; without this reset,
+    // `settled` would resolve before the second turn has even reached the
+    // driver.
+    events.length = 0;
     await second.send({ projectId: project.id, sessionId, backend: "claude", prompt: "two" });
     await settled(sessionId);
 
@@ -313,6 +317,103 @@ describe("chat manager · echo driver", () => {
     });
     await settled(sessionId);
     expect(failures).toEqual(["claude"]);
+    await manager.dispose();
+  });
+});
+
+describe("chat manager · driver cache", () => {
+  /** A factory that counts constructions and disposals, driven by a mutable key. */
+  function makeCountingManager() {
+    const counters = { built: 0, disposed: 0 };
+    let key = "echo:/usr/bin/one";
+    return {
+      counters,
+      setKey(next: string) {
+        key = next;
+      },
+      manager: new ChatManager({
+        db,
+        emit: (message) => events.push(message),
+        resolveProjectPath: () => project.path,
+        driverKey: async () => key,
+        createDriver: async () => {
+          counters.built += 1;
+          const inner = createEchoDriver({ delayMs: 0 });
+          return {
+            backend: inner.backend,
+            send: (options) => inner.send(options),
+            async dispose() {
+              counters.disposed += 1;
+              await inner.dispose();
+            },
+          } satisfies ChatDriver;
+        },
+      }),
+    };
+  }
+
+  it("builds the driver once while its key is stable", async () => {
+    const { manager, counters } = makeCountingManager();
+    const first = await manager.send({ projectId: project.id, backend: "echo", prompt: "a" });
+    await settled(first.sessionId);
+    const second = await manager.send({ projectId: project.id, backend: "echo", prompt: "b" });
+    await settled(second.sessionId);
+
+    expect(counters).toEqual({ built: 1, disposed: 0 });
+    await manager.dispose();
+  });
+
+  it("disposes and rebuilds the driver when its key changes — no restart needed", async () => {
+    const { manager, counters, setKey } = makeCountingManager();
+    const first = await manager.send({ projectId: project.id, backend: "echo", prompt: "a" });
+    await settled(first.sessionId);
+
+    setKey("echo:/usr/bin/two");
+    const second = await manager.send({ projectId: project.id, backend: "echo", prompt: "b" });
+    await settled(second.sessionId);
+
+    expect(counters).toEqual({ built: 2, disposed: 1 });
+    // The turn on the rebuilt driver actually streamed.
+    expect(textOf(second.sessionId)).toContain("b");
+    await manager.dispose();
+    expect(counters.disposed).toBe(2);
+  });
+
+  it("reports a missing CLI as cli_missing, not unknown", async () => {
+    const manager = new ChatManager({
+      db,
+      emit: (message) => events.push(message),
+      resolveProjectPath: () => project.path,
+      createDriver: createDriverFactory({
+        detection: async () => {
+          const missing = (vendor: "claude" | "codex") =>
+            ({
+              vendor,
+              installed: false,
+              path: null,
+              source: null,
+              version: null,
+              auth: "unknown",
+              note: null,
+            }) as const;
+          return {
+            checkedAt: new Date().toISOString(),
+            echoEnabled: false,
+            clis: { claude: missing("claude"), codex: missing("codex") },
+          };
+        },
+      }),
+    });
+    const { sessionId } = await manager.send({
+      projectId: project.id,
+      backend: "claude",
+      prompt: "hi",
+    });
+    await settled(sessionId);
+
+    const errors = events.filter((e) => e.sessionId === sessionId && e.event.type === "error");
+    expect(errors).toHaveLength(1);
+    expect(errors[0]!.event).toMatchObject({ code: "cli_missing" });
     await manager.dispose();
   });
 });

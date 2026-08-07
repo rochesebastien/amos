@@ -88,9 +88,10 @@ npm run build        # typecheck + electron-vite build into out/
 
 ### Packaging
 
-`electron-builder.yml` produces an NSIS installer on Windows (one installer
-carrying x64 + arm64), a DMG + zip on macOS (x64 + arm64), and an AppImage on
-Linux. App icons are generated from `src/renderer/src/assets/logo.svg` by
+`electron-builder.yml` produces an NSIS installer on Windows (x64 only —
+Windows-on-ARM is deferred until the MSVC ARM64 cross-compile of
+better-sqlite3 can be tested on a runner), a DMG + zip on macOS
+(x64 + arm64), and an AppImage on Linux. App icons are generated from `src/renderer/src/assets/logo.svg` by
 `node scripts/gen-icons.mjs`.
 
 ```bash

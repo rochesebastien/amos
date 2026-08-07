@@ -90,6 +90,8 @@ export class WatchManager {
 
   /** Project id → its watchers: the scan roots, plus the flat root watcher. */
   private readonly projects = new Map<string, FSWatcher[]>();
+  /** Project id → watcher over files a scan found outside the fixed roots. */
+  private readonly extras = new Map<string, { watcher: FSWatcher; paths: Set<string> }>();
   /** Project id → pending debounce timer. */
   private readonly timers = new Map<string, NodeJS.Timeout>();
   /** Shared watcher on `~/.claude` and `~/.codex`, created with the first project. */
@@ -123,10 +125,42 @@ export class WatchManager {
     this.ensureGlobalWatcher();
   }
 
+  /**
+   * Watch the exact files a scan discovered outside the fixed root names —
+   * nested `AGENTS.md` files, in practice. Called with each scan's findings,
+   * it diffs against what is already watched, so repeated scans are cheap.
+   *
+   * This only covers files a scan has already seen: a nested file *created*
+   * later is picked up at the next scan, not the moment it appears — watching
+   * for its appearance would mean watching the whole tree, which the fixed
+   * roots deliberately avoid.
+   */
+  setExtraFiles(projectId: string, files: string[]): void {
+    if (this.closed || !this.projects.has(projectId)) return;
+    const next = new Set(files.map((file) => path.resolve(file)));
+    const entry = this.extras.get(projectId);
+    if (!entry) {
+      if (next.size === 0) return;
+      this.extras.set(projectId, {
+        watcher: this.createWatcher([...next], () => this.schedule(projectId), { depth: 0 }),
+        paths: next,
+      });
+      return;
+    }
+    const added = [...next].filter((file) => !entry.paths.has(file));
+    const removed = [...entry.paths].filter((file) => !next.has(file));
+    if (added.length > 0) entry.watcher.add(added);
+    if (removed.length > 0) entry.watcher.unwatch(removed);
+    entry.paths = next;
+  }
+
   /** Stop watching one project, and the global roots once none are left. */
   async unwatch(projectId: string): Promise<void> {
     const watchers = this.projects.get(projectId) ?? [];
+    const extra = this.extras.get(projectId);
+    if (extra) watchers.push(extra.watcher);
     this.projects.delete(projectId);
+    this.extras.delete(projectId);
     this.cancel(projectId);
     await Promise.all(watchers.map((w) => w.close().catch(() => undefined)));
     if (this.projects.size === 0) await this.closeGlobalWatcher();
@@ -140,8 +174,12 @@ export class WatchManager {
   async closeAll(): Promise<void> {
     this.closed = true;
     for (const id of [...this.timers.keys()]) this.cancel(id);
-    const watchers = [...this.projects.values()].flat();
+    const watchers = [
+      ...[...this.projects.values()].flat(),
+      ...[...this.extras.values()].map((entry) => entry.watcher),
+    ];
     this.projects.clear();
+    this.extras.clear();
     await Promise.all(watchers.map((w) => w.close().catch(() => undefined)));
     await this.closeGlobalWatcher();
   }

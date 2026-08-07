@@ -1,3 +1,4 @@
+import path from "node:path";
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import { z } from "zod";
 import type {
@@ -40,7 +41,7 @@ import {
   markAuthFailure,
   markAuthSuccess,
 } from "./chat/detect.js";
-import { ChatManager, createDriverFactory } from "./chat/manager.js";
+import { ChatManager, createDriverFactory, createDriverKey } from "./chat/manager.js";
 import { scanProject } from "./scanner/index.js";
 import { writeAgent, writeMcp, writeSkillMd } from "./scanner/writers.js";
 import { WatchManager } from "./scanner/watch.js";
@@ -200,6 +201,7 @@ export function registerIpcHandlers(): void {
       detection: currentDetection,
       log: (message) => console.warn(`[amos:chat] ${message}`),
     }),
+    driverKey: createDriverKey({ detection: currentDetection }),
     onAuthFailure: (vendor) => {
       markAuthFailure(vendor);
       void refreshDetection();
@@ -242,7 +244,18 @@ export function registerIpcHandlers(): void {
   handle("scan:project", ScanRequest, async (input) => {
     const project = getProject(input.projectId);
     if (!project) throw new Error(`Unknown project: ${input.projectId}`);
-    return await scanProject(project.path);
+    const scan = await scanProject(project.path);
+    // Nested instruction files (AGENTS.md below the root) sit outside the
+    // fixed watch roots; hand the watcher the exact paths this scan found so
+    // external edits to them refresh the UI too.
+    const root = path.resolve(project.path);
+    watchManager?.setExtraFiles(
+      project.id,
+      scan.instructions
+        .filter((file) => file.scope === "project" && path.dirname(path.resolve(file.path)) !== root)
+        .map((file) => file.path),
+    );
+    return scan;
   });
 
   handle("scan:watch", ScanRequest, (input) => {

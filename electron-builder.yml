@@ -71,11 +71,14 @@ npmRebuild: true
 # Windows and macOS, build/icons/*.png feeds Linux. Regenerate them with
 # `node scripts/gen-icons.mjs`.
 
+# x64 only for now: arm64 would require cross-compiling better-sqlite3 with
+# the MSVC ARM64 toolchain on the CI runner, which is not guaranteed to be
+# present. Revisit once a Windows-on-ARM build can actually be tested.
 win:
   target:
     - target: nsis
-      arch: [x64, arm64]
-  artifactName: ${productName}-${version}-setup.${ext}
+      arch: [x64]
+  artifactName: ${productName}-${version}-${arch}-setup.${ext}
 
 nsis:
   oneClick: false
@@ -96,7 +99,11 @@ mac:
   artifactName: ${productName}-${version}-${arch}.${ext}
   # AMOS drives the claude/codex CLIs as child processes; the hardened runtime
   # kills that without these entitlements once the app is signed & notarised.
+  # `entitlements` covers the app binary itself, `entitlementsInherit` the
+  # bundled helper processes — both must point at the project's plist or the
+  # main executable silently falls back to electron-builder's default one.
   hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
 
 dmg:
