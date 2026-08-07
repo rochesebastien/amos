@@ -1,6 +1,7 @@
 import { AlertTriangle, Bot, Plug, Sparkles } from "lucide-react";
 import type { CapabilityItem, CapabilityKind, Ecosystem, Scope } from "@shared/capabilities";
 import { Badge } from "@/components/ui/badge";
+import { EcosystemGlyph } from "@/components/BrandIcons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -24,17 +25,32 @@ const SIZES = {
   md: "px-2 py-0.5 text-[11px]",
 } as const;
 
+/** Glyph size matching each badge size, so a row of both lines up. */
+const GLYPH_SIZES = {
+  sm: "size-3",
+  md: "size-3.5",
+} as const;
+
 type Size = keyof typeof SIZES;
 
+/**
+ * The ecosystem is shown as its mark, not as the word: in a list of thirty
+ * capabilities the glyph is read at a glance where the two labels have to be
+ * read one by one. The name stays reachable — as the accessible name of the
+ * icon and as the tooltip.
+ */
 export function EcosystemBadge({ ecosystem, size = "md" }: { ecosystem: Ecosystem; size?: Size }) {
   const t = useT();
+  const name = t(`cap.eco.${ecosystem}`);
   return (
-    <Badge
-      variant={ecosystem === "claude" ? "primary" : "secondary"}
-      className={cn("shrink-0", SIZES[size])}
-    >
-      {t(`cap.eco.${ecosystem}`)}
-    </Badge>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex shrink-0 items-center text-foreground/75">
+          <EcosystemGlyph ecosystem={ecosystem} className={GLYPH_SIZES[size]} title={name} />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{name}</TooltipContent>
+    </Tooltip>
   );
 }
 

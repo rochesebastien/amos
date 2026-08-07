@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { AlertCircle, CheckCircle2, RefreshCw, Settings as SettingsIcon, Terminal } from "lucide-react";
 import { CLI_VENDORS, type CliDetection, type CliVendor } from "@shared/chat";
 import { useT, type TFunc } from "@/lib/i18n";
+import { EcosystemGlyph } from "@/components/BrandIcons";
 import { useRecheckClis } from "@/lib/queries";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -94,6 +95,7 @@ function VendorCard({
         ) : (
           <AlertCircle className="size-4 text-muted-foreground/60" />
         )}
+        <EcosystemGlyph ecosystem={vendor} className="size-4" />
         {t(`cap.eco.${vendor}`)}
         <span className="ml-auto text-[12px] font-normal text-muted-foreground/70">
           {status?.installed

@@ -66,7 +66,7 @@ export function WelcomeView() {
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-8 py-16">
         <header className="flex flex-col items-center gap-4 text-center">
           <LogoMark className="size-20" />
-          <h1 className="text-3xl font-display">{t("welcome.title")}</h1>
+          <h1 className="text-2xl font-display">{t("welcome.title")}</h1>
           <p className="max-w-lg text-sm text-muted-foreground/80">{t("welcome.subtitle")}</p>
           <Button size="lg" onClick={() => void openFolder()} disabled={busy}>
             <FolderPlus className="size-4" />

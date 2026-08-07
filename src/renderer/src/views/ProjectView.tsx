@@ -74,8 +74,8 @@ export function ProjectView() {
     <div className="flex min-w-0 flex-1 flex-col">
       <header className="flex items-start gap-4 px-8 pt-8 pb-4">
         <div className="min-w-0 flex-1">
-          <h1 className="flex items-center gap-3 text-3xl font-display">
-            <FolderOpen className="size-7 shrink-0 text-primary" />
+          <h1 className="flex items-center gap-3 text-2xl font-display">
+            <FolderOpen className="size-5 shrink-0 text-muted-foreground" />
             <span className="truncate">{project.name}</span>
           </h1>
           <p className="mt-1 truncate text-sm text-muted-foreground/70" title={project.path}>
@@ -91,7 +91,7 @@ export function ProjectView() {
         <Link
           to="/p/$projectId/chat"
           params={{ projectId }}
-          className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-[filter] hover:brightness-105"
+          className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
         >
           <MessageSquare className="size-4" />
           {t("chat.title")}
@@ -129,7 +129,7 @@ export function ProjectView() {
         {/* instruction files */}
         <section className="mt-8 max-w-4xl">
           <h2 className="mb-2 flex items-center gap-2 text-base font-display">
-            <FileText className="size-4 text-primary" />
+            <FileText className="size-4 text-muted-foreground" />
             {t("project.instructions")}
           </h2>
           {scan && scan.instructions.length === 0 && (
@@ -141,7 +141,7 @@ export function ProjectView() {
                 <Link
                   to="/p/$projectId/instructions/$fileId"
                   params={{ projectId, fileId: file.id }}
-                  className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm transition-colors hover:border-primary/40 hover:bg-accent/60"
+                  className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm transition-colors hover:bg-accent/60"
                   title={file.path}
                 >
                   <span className="min-w-0 flex-1 truncate font-mono text-[13px]">
@@ -313,7 +313,7 @@ function KindCard({
   return (
     <section className="rounded-xl border border-border bg-card p-5">
       <h2 className="mb-2 flex items-center gap-2 text-base font-display">
-        <Icon className="size-4 text-primary" />
+        <Icon className="size-4 text-muted-foreground" />
         {label}
         <span className="ml-auto text-2xl font-display tabular-nums">
           {total === null ? "…" : total}

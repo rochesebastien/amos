@@ -60,8 +60,8 @@ export function ItemView() {
           {t("cap.backToProject")}
         </Link>
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="flex min-w-0 items-center gap-3 text-3xl font-display">
-            <Icon className="size-7 shrink-0 text-primary" />
+          <h1 className="flex min-w-0 items-center gap-3 text-2xl font-display">
+            <Icon className="size-5 shrink-0 text-muted-foreground" />
             <span className="truncate">{item.name}</span>
           </h1>
           <CapabilityBadges item={item} />

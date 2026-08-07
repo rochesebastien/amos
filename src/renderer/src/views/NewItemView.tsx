@@ -143,8 +143,8 @@ export function NewItemView() {
           <ArrowLeft className="size-3.5" />
           {t("cap.backToProject")}
         </Link>
-        <h1 className="flex items-center gap-3 text-3xl font-display">
-          <Icon className="size-7 shrink-0 text-primary" />
+        <h1 className="flex items-center gap-3 text-2xl font-display">
+          <Icon className="size-5 shrink-0 text-muted-foreground" />
           {t(`new.title.${kind}`)}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground/70">{t(`new.subtitle.${kind}`)}</p>

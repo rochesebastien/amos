@@ -4,15 +4,16 @@ import { cn } from "@/lib/utils";
 type Variant = "primary" | "secondary" | "outline" | "ghost" | "destructive";
 type Size = "sm" | "md" | "lg" | "icon" | "icon-sm" | "icon-xs";
 
+// A near-black (or, in dark mode, near-white) solid does not react to a
+// brightness filter, so the filled variants dim on hover instead.
 const variants: Record<Variant, string> = {
-  primary:
-    "bg-primary text-primary-foreground hover:brightness-105 active:brightness-95 font-semibold",
+  primary: "bg-primary text-primary-foreground hover:opacity-90 active:opacity-80 font-medium",
   secondary:
     "bg-secondary text-secondary-foreground hover:bg-accent",
   outline:
     "border border-input bg-transparent hover:bg-accent text-foreground",
   ghost: "hover:bg-accent text-foreground",
-  destructive: "bg-destructive text-destructive-foreground hover:brightness-110",
+  destructive: "bg-destructive text-destructive-foreground hover:opacity-90",
 };
 
 const sizes: Record<Size, string> = {
@@ -35,7 +36,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     <button
       ref={ref}
       className={cn(
-        "inline-flex items-center justify-center rounded-lg whitespace-nowrap transition-[background,color,filter] duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:pointer-events-none select-none",
+        "inline-flex items-center justify-center rounded-md whitespace-nowrap transition-[background,color,opacity] duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:pointer-events-none select-none",
         variants[variant],
         sizes[size],
         className,

@@ -458,7 +458,7 @@ function ProjectRow({
           className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {active ? (
-            <FolderOpen className="size-3.5 shrink-0 text-primary" />
+            <FolderOpen className="size-3.5 shrink-0 text-muted-foreground" />
           ) : (
             <Folder className="size-3.5 shrink-0" />
           )}

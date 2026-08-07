@@ -21,9 +21,8 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 // ---------------------------------------------------------------- geometry
 // All coordinates in the logo.svg 64x64 viewBox; scaled to the target size.
 const VIEW = 64;
-const NAVY = [0x00, 0x1e, 0x2b];
-const CREAM = [0xff, 0xfe, 0xeb];
-const GREEN = [0x00, 0xed, 0x64];
+const INK = [0x0a, 0x0a, 0x0a]; // tile
+const PAPER = [0xfa, 0xfa, 0xfa]; // glyph
 
 const HUB = { x: 32, y: 32, r: 7 };
 const SATELLITES = [
@@ -88,20 +87,20 @@ function render(size) {
       const uy = (y + 0.5) / scale;
       px[0] = px[1] = px[2] = px[3] = 0;
 
-      over(px, NAVY, coverage(sdRoundedRect(ux, uy, VIEW, VIEW, CORNER_R) * scale));
+      over(px, INK, coverage(sdRoundedRect(ux, uy, VIEW, VIEW, CORNER_R) * scale));
 
       let wire = Infinity;
       for (const s of SATELLITES) {
         wire = Math.min(wire, sdSegment(ux, uy, HUB.x, HUB.y, s.x, s.y, WIRE_HALF_W));
       }
-      over(px, CREAM, coverage(wire * scale) * 0.45);
+      over(px, PAPER, coverage(wire * scale) * 0.35);
 
       let sat = Infinity;
       for (const s of SATELLITES) {
         sat = Math.min(sat, sdCircle(ux, uy, s.x, s.y, SATELLITE_R));
       }
-      over(px, CREAM, coverage(sat * scale));
-      over(px, GREEN, coverage(sdCircle(ux, uy, HUB.x, HUB.y, HUB.r) * scale));
+      over(px, PAPER, coverage(sat * scale) * 0.55);
+      over(px, PAPER, coverage(sdCircle(ux, uy, HUB.x, HUB.y, HUB.r) * scale));
 
       const o = (y * size + x) * 4;
       rgba[o] = Math.round(px[0]);
