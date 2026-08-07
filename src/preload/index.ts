@@ -21,6 +21,9 @@ const amos: AmosApi = {
   dialog: {
     pickFolder: () => invoke("dialog:pickFolder"),
   },
+  scan: {
+    project: (input) => invoke("scan:project", input),
+  },
   settings: {
     get: (input) => invoke("settings:get", input),
     set: (input) => invoke("settings:set", input),

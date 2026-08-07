@@ -1,0 +1,5 @@
+{
+  "mcpServers": {
+    "shared": { "command": "shared-server", "args": ["--stdio"] }
+  }
+}

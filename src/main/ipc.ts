@@ -3,10 +3,12 @@ import { z } from "zod";
 import type { IpcChannel, IpcRequest, IpcResponse, PingResult } from "../shared/ipc.js";
 import {
   addProject,
+  getProject,
   listProjects,
   removeProject,
   touchProject,
 } from "./services/projects.js";
+import { scanProject } from "./scanner/index.js";
 import { getSetting, setSetting } from "./services/settings.js";
 
 /**
@@ -16,6 +18,7 @@ import { getSetting, setSetting } from "./services/settings.js";
 
 const NoPayload = z.void().optional();
 const ProjectId = z.object({ id: z.string().min(1) });
+const ScanRequest = z.object({ projectId: z.string().min(1) });
 const ProjectPath = z.object({ path: z.string().min(1) });
 const SettingKey = z.object({ key: z.string().min(1).max(200) });
 const SettingEntry = z.object({ key: z.string().min(1).max(200), value: z.string().max(100_000) });
@@ -58,6 +61,14 @@ export function registerIpcHandlers(): void {
       : await dialog.showOpenDialog(options);
     if (result.canceled || result.filePaths.length === 0) return { path: null };
     return { path: result.filePaths[0]! };
+  });
+
+  // The renderer only ever names a project it already knows: the scanner is
+  // handed a path from the database, never one crossing the bridge.
+  handle("scan:project", ScanRequest, async (input) => {
+    const project = getProject(input.projectId);
+    if (!project) throw new Error(`Unknown project: ${input.projectId}`);
+    return await scanProject(project.path);
   });
 
   handle("settings:get", SettingKey, (input) => getSetting(input.key));

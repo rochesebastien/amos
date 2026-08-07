@@ -2,8 +2,9 @@
 // Everything here goes through the `window.amos` bridge installed by the
 // preload script — the renderer itself has no Node access.
 import type { AmosApi, PickFolderResult, Project, SettingValue } from "@shared/ipc";
+import type { ProjectScan } from "@shared/capabilities";
 
-export type { Project, PickFolderResult, SettingValue };
+export type { Project, PickFolderResult, SettingValue, ProjectScan };
 
 /**
  * The bridge is missing only when the renderer is opened outside Electron
@@ -27,6 +28,8 @@ export const ipc = {
   touchProject: (id: string) => bridge().projects.touch({ id }),
 
   pickFolder: () => bridge().dialog.pickFolder(),
+
+  scanProject: (projectId: string) => bridge().scan.project({ projectId }),
 
   getSetting: (key: string) => bridge().settings.get({ key }),
   setSetting: (key: string, value: string) => bridge().settings.set({ key, value }),

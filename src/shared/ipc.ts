@@ -7,6 +7,8 @@
  * the sandboxed renderer as well.
  */
 
+import type { ProjectScan } from "./capabilities.js";
+
 // ---------------------------------------------------------------- data model
 
 /** A project is a folder on disk that AMOS knows about. */
@@ -56,6 +58,12 @@ export type IpcInvokeMap = {
   /** Native "choose a directory" dialog. */
   "dialog:pickFolder": { request: void; response: PickFolderResult };
 
+  /**
+   * Walk a known project (and the user's home) for agents, skills and MCP
+   * servers. Never cached in the database: the filesystem is the truth.
+   */
+  "scan:project": { request: { projectId: string }; response: ProjectScan };
+
   /** Read one persisted setting. */
   "settings:get": { request: { key: string }; response: SettingValue };
   /** Write one persisted setting. */
@@ -75,6 +83,7 @@ export const IPC_CHANNELS = [
   "projects:remove",
   "projects:touch",
   "dialog:pickFolder",
+  "scan:project",
   "settings:get",
   "settings:set",
 ] as const satisfies readonly IpcChannel[];
@@ -95,6 +104,9 @@ export type AmosApi = {
   };
   dialog: {
     pickFolder(): Promise<PickFolderResult>;
+  };
+  scan: {
+    project(input: { projectId: string }): Promise<ProjectScan>;
   };
   settings: {
     get(input: { key: string }): Promise<SettingValue>;

@@ -12,15 +12,18 @@ import {
   PanelLeftOpen,
   ArrowDownUp,
   Check,
+  ChevronRight,
   Plus,
 } from "lucide-react";
+import { itemsOfKind, type CapabilityKind } from "@shared/capabilities";
 import { useApp } from "@/lib/store";
-import { useT } from "@/lib/i18n";
-import { useProjectMutations, useProjects } from "@/lib/queries";
+import { useT, type TFunc } from "@/lib/i18n";
+import { useProjectMutations, useProjects, useProjectScan } from "@/lib/queries";
 import { ipc, type Project } from "@/lib/ipc";
 import { useSidebar, type ProjectSort, SIDEBAR_RAIL } from "@/lib/sidebar";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useConfirm } from "@/components/ui/confirm";
+import { CapabilityBadges, KIND_ICONS } from "@/components/CapabilityBadges";
 import { cn } from "@/lib/utils";
 import logoIcon from "@/assets/logo.png";
 import logoTitleBlack from "@/assets/logo_title_black.png";
@@ -310,40 +313,15 @@ export function Sidebar() {
         )}
 
         <div className="flex flex-col gap-0.5">
-          {sorted.map((p) => {
-            const active = activeProjectId === p.id;
-            return (
-              <div
-                key={p.id}
-                onClick={() => void openProject(p)}
-                title={p.path}
-                className={cn(
-                  "group flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors",
-                  active
-                    ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
-                    : "text-muted-foreground hover:bg-sidebar-accent/60",
-                )}
-              >
-                {active ? (
-                  <FolderOpen className="size-3.5 shrink-0 text-primary" />
-                ) : (
-                  <Folder className="size-3.5 shrink-0" />
-                )}
-                <span className="min-w-0 flex-1 truncate">{p.name}</span>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={(e) => void removeProject(e, p)}
-                      className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:text-destructive group-hover:opacity-60"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">{t("projects.remove")}</TooltipContent>
-                </Tooltip>
-              </div>
-            );
-          })}
+          {sorted.map((p) => (
+            <ProjectRow
+              key={p.id}
+              project={p}
+              active={activeProjectId === p.id}
+              onOpen={() => void openProject(p)}
+              onRemove={(e) => void removeProject(e, p)}
+            />
+          ))}
         </div>
       </div>
 
@@ -393,5 +371,160 @@ export function Sidebar() {
         className="absolute right-0 top-0 z-10 h-full w-1 cursor-col-resize transition-colors hover:bg-primary/40"
       />
     </aside>
+  );
+}
+
+/** The three capability sections, in the order the sidebar shows them. */
+const SECTIONS: { kind: CapabilityKind; labelKey: string }[] = [
+  { kind: "agent", labelKey: "project.agents" },
+  { kind: "mcp", labelKey: "project.mcps" },
+  { kind: "skill", labelKey: "project.skills" },
+];
+
+/**
+ * One project in the sidebar: a clickable name leading to the overview, and —
+ * at its right — a chevron unfolding the Agents / MCPs / Skills the scanner
+ * found. The scan only runs once a project is actually unfolded.
+ */
+function ProjectRow({
+  project,
+  active,
+  onOpen,
+  onRemove,
+}: {
+  project: Project;
+  active: boolean;
+  onOpen: () => void;
+  onRemove: (e: React.MouseEvent) => void;
+}) {
+  const t = useT();
+  const expandedIds = useSidebar((s) => s.expanded);
+  const toggleExpanded = useSidebar((s) => s.toggleExpanded);
+  const open = expandedIds.includes(project.id);
+  const { data: scan, isPending, isError, error } = useProjectScan(project.id, open);
+
+  return (
+    <div>
+      <div
+        onClick={onOpen}
+        title={project.path}
+        className={cn(
+          "group flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors",
+          active
+            ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
+            : "text-muted-foreground hover:bg-sidebar-accent/60",
+        )}
+      >
+        {active ? (
+          <FolderOpen className="size-3.5 shrink-0 text-primary" />
+        ) : (
+          <Folder className="size-3.5 shrink-0" />
+        )}
+        <span className="min-w-0 flex-1 truncate">{project.name}</span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              aria-expanded={open}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleExpanded(project.id);
+              }}
+              className="shrink-0 rounded p-0.5 text-muted-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-foreground"
+            >
+              <ChevronRight
+                className={cn("size-3.5 transition-transform", open && "rotate-90")}
+              />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right">
+            {t(open ? "sidebar.collapseProject" : "sidebar.expandProject")}
+          </TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={onRemove}
+              className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:text-destructive group-hover:opacity-60"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right">{t("projects.remove")}</TooltipContent>
+        </Tooltip>
+      </div>
+
+      {open && (
+        <div className="my-0.5 ml-3.5 border-l border-sidebar-border pl-1.5">
+          {isPending && (
+            <p className="px-2 py-1 text-[12px] text-muted-foreground/60">
+              {t("sidebar.scanning")}
+            </p>
+          )}
+          {isError && (
+            <p className="px-2 py-1 text-[12px] text-destructive">
+              {t("project.scanFailed", { error: (error as Error).message })}
+            </p>
+          )}
+          {scan &&
+            SECTIONS.map((section) => (
+              <CapabilitySection
+                key={section.kind}
+                t={t}
+                projectId={project.id}
+                kind={section.kind}
+                label={t(section.labelKey)}
+                items={itemsOfKind(scan.items, section.kind)}
+              />
+            ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** One `Agents` / `MCPs` / `Skills` group under an unfolded project. */
+function CapabilitySection({
+  t,
+  projectId,
+  kind,
+  label,
+  items,
+}: {
+  t: TFunc;
+  projectId: string;
+  kind: CapabilityKind;
+  label: string;
+  items: ReturnType<typeof itemsOfKind>;
+}) {
+  const Icon = KIND_ICONS[kind];
+  return (
+    <div className="py-0.5">
+      <div className="flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+        <Icon className="size-3" />
+        <span className="truncate">{label}</span>
+        <span className="text-muted-foreground/40">{items.length}</span>
+      </div>
+      {items.length === 0 ? (
+        <p className="px-2 pb-0.5 pl-4 text-[12px] text-muted-foreground/50">
+          {t("sidebar.sectionEmpty")}
+        </p>
+      ) : (
+        items.map((item) => (
+          <Link
+            key={item.id}
+            to="/p/$projectId/item/$itemId"
+            params={{ projectId, itemId: item.id }}
+            title={item.sourceFile}
+            className="flex items-center gap-1.5 rounded-md py-1 pl-4 pr-2 text-[12px] text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
+            activeProps={{
+              className: "bg-sidebar-accent font-semibold text-sidebar-accent-foreground",
+            }}
+          >
+            <span className="min-w-0 flex-1 truncate">{item.name}</span>
+            <CapabilityBadges item={item} size="sm" />
+          </Link>
+        ))
+      )}
+    </div>
   );
 }

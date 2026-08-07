@@ -14,6 +14,7 @@ export const queryClient = new QueryClient({
 
 export const qk = {
   projects: ["projects"] as const,
+  scan: (projectId: string) => ["scan", projectId] as const,
   setting: (key: string) => ["setting", key] as const,
 };
 
@@ -21,6 +22,20 @@ export const qk = {
 
 export function useProjects() {
   return useQuery({ queryKey: qk.projects, queryFn: ipc.listProjects });
+}
+
+/**
+ * Capabilities of one project. Never persisted: the scan runs in the main
+ * process on demand, and the cache here is only what React renders from.
+ * `enabled` keeps the sidebar from scanning projects nobody expanded.
+ */
+export function useProjectScan(projectId: string | null | undefined, enabled = true) {
+  return useQuery({
+    queryKey: qk.scan(projectId ?? ""),
+    queryFn: () => ipc.scanProject(projectId!),
+    enabled: Boolean(projectId) && enabled,
+    staleTime: 5_000,
+  });
 }
 
 export function useSetting(key: string) {

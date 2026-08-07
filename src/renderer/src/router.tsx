@@ -11,6 +11,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { SettingsLayout } from "@/views/settings/SettingsLayout";
 import { WelcomeView } from "@/views/WelcomeView";
 import { ProjectView } from "@/views/ProjectView";
+import { ItemView } from "@/views/ItemView";
 import { GeneralSettings } from "@/views/settings/GeneralSettings";
 
 function RootShell() {
@@ -37,11 +38,18 @@ const welcomeRoute = createRoute({
   component: WelcomeView,
 });
 
-/** Project overview. Chat and item routes hang off this one in later phases. */
+/** Project overview. The chat route joins these in a later phase. */
 const projectRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/p/$projectId",
   component: ProjectView,
+});
+
+/** Read-only detail of one agent / skill / MCP server of a project. */
+const itemRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/p/$projectId/item/$itemId",
+  component: ItemView,
 });
 
 // --- Settings: layout route with its own sub-sidebar + nested sections -------
@@ -69,6 +77,7 @@ const generalSettingsRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   welcomeRoute,
   projectRoute,
+  itemRoute,
   settingsRoute.addChildren([settingsIndexRoute, generalSettingsRoute]),
 ]);
 

@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "."],
+      "env": { "ROOT": "/srv" }
+    },
+    "docs": {
+      "type": "http",
+      "url": "https://docs.example.com/mcp",
+      "headers": { "Authorization": "Bearer x" }
+    },
+    "events": { "type": "sse", "url": "https://events.example.com/sse" },
+    "socket": { "type": "ws", "url": "wss://socket.example.com" }
+  },
+  "someUnknownTopLevelKey": { "kept": true }
+}
