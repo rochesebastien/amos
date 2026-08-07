@@ -19,7 +19,19 @@ function LanguageSync() {
   return null;
 }
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
+// This module has no component export, so vite-plugin-react cannot Fast Refresh
+// it and invalidates it instead — every HMR update that reaches a shared module
+// (lib/dictionaries.ts, lib/queries.ts, …) propagates up here and re-executes
+// this file. A second `createRoot` on the same container tears the first root
+// down and leaves the window blank until a manual reload, so the root is kept in
+// `import.meta.hot.data`, which survives hot updates of this module. In a
+// production build `import.meta.hot` is undefined and this is a plain
+// `createRoot` + `render`.
+const container = document.getElementById("root")!;
+const root = import.meta.hot?.data.root ?? ReactDOM.createRoot(container);
+if (import.meta.hot) import.meta.hot.data.root = root;
+
+root.render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
