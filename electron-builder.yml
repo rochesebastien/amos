@@ -25,6 +25,16 @@ files:
   # and useless once build/Release/better_sqlite3.node exists.
   - "!**/node_modules/better-sqlite3/{deps,src}${/*}"
   - "!**/node_modules/better-sqlite3/build/{Release/obj,Release/obj.target,deps,*.mk,Makefile,*.gypi,config.gypi,binding.Makefile}${/*}"
+  # `@anthropic-ai/claude-agent-sdk-<platform>` is a 280 MB optional dependency
+  # that vendors a whole `claude` binary, and it is the SDK's fallback only when
+  # `pathToClaudeCodeExecutable` is absent. AMOS always supplies it: the chat
+  # manager refuses to build a driver unless detection found the user's own CLI
+  # (chat/manager.ts — `if (!status.installed || !status.path) …`), so the
+  # vendored copy is unreachable. Worse, npm only installs the optional package
+  # for the *build host*, so keeping it would ship the wrong platform's binary
+  # on a cross-built Windows or macOS artifact. Verified by packaging without it
+  # and running a real `claude` turn from the unpacked app.
+  - "!**/node_modules/@anthropic-ai/claude-agent-sdk-*${/*}"
 
 asar: true
 # better-sqlite3 is a native module: its .node binary cannot be loaded from
