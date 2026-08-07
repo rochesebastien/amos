@@ -172,6 +172,30 @@ export const dict: Record<Lang, Record<string, string>> = {
     "mcp.tomlCommentsDropped":
       "Saved. The comments this file carried are gone from it; they are still in the .bak copy.",
 
+    // instruction files — CLAUDE.md / AGENTS.md
+    "instructions.edit": "Edit",
+    "instructions.notFound": "Unknown instruction file",
+    "instructions.notFoundDesc":
+      "This file is not in the project any more. Rescan to refresh the list.",
+    "instructions.read.claude": "Claude Code reads this file at the start of every session.",
+    "instructions.read.codex": "Codex reads this file for the folder it sits in, and below it.",
+    "instructions.modeEdit": "Edit",
+    "instructions.modeSplit": "Split",
+    "instructions.modePreview": "Preview",
+    "instructions.lines": "{n} lines",
+    "instructions.editorLabel": "Content of {name}",
+    "instructions.placeholder": "What every session in this project should know, in markdown.",
+    "instructions.emptyPreview": "Nothing to preview yet.",
+    "instructions.changedOnDisk":
+      "This file changed on disk while you were editing it. Saving will ask you whose version wins.",
+    "instructions.create": "Create {name}",
+    "instructions.createHint":
+      "Created at the root of the project, where the CLI looks for it, with a short scaffold you can rewrite.",
+    "instructions.scaffold.claude":
+      "# {name}\n\nProject instructions for Claude Code — loaded at the start of every session.\n\n## Overview\n\nWhat this project is, and how it is laid out.\n\n## Conventions\n\n- Conventions to follow when changing this code.\n\n## Commands\n\n- The build, test and lint commands worth knowing.\n",
+    "instructions.scaffold.codex":
+      "# {name}\n\nProject instructions for Codex and any agent that reads AGENTS.md.\n\n## Overview\n\nWhat this project is, and how it is laid out.\n\n## Conventions\n\n- Conventions to follow when changing this code.\n\n## Commands\n\n- The build, test and lint commands worth knowing.\n",
+
     // creating a capability
     "new.title.agent": "New agent",
     "new.title.skill": "New skill",
@@ -448,6 +472,30 @@ export const dict: Record<Lang, Record<string, string>> = {
       "Ce fichier de configuration est en TOML. AMOS ne sait pas réécrire les commentaires TOML : enregistrer les supprime — la copie .bak à côté du fichier les conserve.",
     "mcp.tomlCommentsDropped":
       "Enregistré. Les commentaires de ce fichier en ont disparu ; ils restent dans la copie .bak.",
+
+    "instructions.edit": "Modifier",
+    "instructions.notFound": "Fichier d’instructions inconnu",
+    "instructions.notFoundDesc":
+      "Ce fichier n’est plus dans le projet. Relancez l’analyse pour rafraîchir la liste.",
+    "instructions.read.claude": "Claude Code lit ce fichier au début de chaque session.",
+    "instructions.read.codex":
+      "Codex lit ce fichier pour le dossier où il se trouve, et pour ceux en dessous.",
+    "instructions.modeEdit": "Édition",
+    "instructions.modeSplit": "Côte à côte",
+    "instructions.modePreview": "Aperçu",
+    "instructions.lines": "{n} lignes",
+    "instructions.editorLabel": "Contenu de {name}",
+    "instructions.placeholder": "Ce que toute session de ce projet doit savoir, en markdown.",
+    "instructions.emptyPreview": "Rien à prévisualiser pour l’instant.",
+    "instructions.changedOnDisk":
+      "Ce fichier a changé sur le disque pendant votre édition. À l’enregistrement, AMOS vous demandera quelle version garder.",
+    "instructions.create": "Créer {name}",
+    "instructions.createHint":
+      "Créé à la racine du projet, là où le CLI le cherche, avec une trame courte que vous pouvez réécrire.",
+    "instructions.scaffold.claude":
+      "# {name}\n\nInstructions de projet pour Claude Code — chargées au début de chaque session.\n\n## Présentation\n\nCe qu’est ce projet, et comment il est organisé.\n\n## Conventions\n\n- Les conventions à respecter en modifiant ce code.\n\n## Commandes\n\n- Les commandes de build, de test et de lint à connaître.\n",
+    "instructions.scaffold.codex":
+      "# {name}\n\nInstructions de projet pour Codex et tout agent qui lit AGENTS.md.\n\n## Présentation\n\nCe qu’est ce projet, et comment il est organisé.\n\n## Conventions\n\n- Les conventions à respecter en modifiant ce code.\n\n## Commandes\n\n- Les commandes de build, de test et de lint à connaître.\n",
 
     "new.title.agent": "Nouvel agent",
     "new.title.skill": "Nouvelle skill",

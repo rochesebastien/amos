@@ -6,6 +6,7 @@ import type { ScanChangedEvent } from "../../src/shared/ipc.js";
 import {
   globalWatchPaths,
   isIgnoredWatchPath,
+  isWatchedRootEntry,
   projectWatchPaths,
   WatchManager,
 } from "../../src/main/scanner/watch.js";
@@ -80,6 +81,16 @@ describe("watch paths", () => {
     ]);
   });
 
+  it("keeps the flat root watcher to the entries a scan reads", () => {
+    expect(isWatchedRootEntry("/p", path.join("/p", "CLAUDE.md"))).toBe(true);
+    expect(isWatchedRootEntry("/p", path.join("/p", "AGENTS.md"))).toBe(true);
+    expect(isWatchedRootEntry("/p", path.join("/p", ".claude"))).toBe(true);
+    expect(isWatchedRootEntry("/p", path.join("/p", "README.md"))).toBe(false);
+    // Nested instruction files are read by the scan but not watched: watching
+    // them would mean watching the whole tree.
+    expect(isWatchedRootEntry("/p", path.join("/p", "packages", "AGENTS.md"))).toBe(false);
+  });
+
   it("ignores the debris of an atomic write and the folders no scan walks", () => {
     expect(isIgnoredWatchPath("/p/.mcp.json.bak")).toBe(true);
     expect(isIgnoredWatchPath("/p/.mcp.json.tmp.4242")).toBe(true);
@@ -99,6 +110,35 @@ describe("WatchManager", () => {
     await waitFor(() => events.length > 0);
     expect(events.map((e) => e.projectId)).toEqual(["p1"]);
     expect(Date.parse(events[0]!.at)).not.toBeNaN();
+  });
+
+  it("reports an external edit of the root CLAUDE.md and AGENTS.md", async () => {
+    // Both are watched as files rather than folders, and both may be created
+    // *after* the watcher started — which is exactly what "Create CLAUDE.md"
+    // does — so the editor open on one of them still learns it moved.
+    manager.watch("p1", project);
+    await new Promise((r) => setTimeout(r, 300));
+
+    await fs.writeFile(path.join(project, "CLAUDE.md"), "# rules\n");
+    await waitFor(() => events.length > 0);
+    expect(events[0]!.projectId).toBe("p1");
+
+    events.length = 0;
+    await fs.writeFile(path.join(project, "AGENTS.md"), "# rules\n");
+    await waitFor(() => events.length > 0);
+    expect(events[0]!.projectId).toBe("p1");
+  });
+
+  it("says nothing about the rest of the project root", async () => {
+    manager.watch("p1", project);
+    await new Promise((r) => setTimeout(r, 300));
+
+    await fs.writeFile(path.join(project, "README.md"), "# hi\n");
+    await fs.mkdir(path.join(project, "src"), { recursive: true });
+    await fs.writeFile(path.join(project, "src", "index.ts"), "export {};\n");
+
+    await settle();
+    expect(events).toEqual([]);
   });
 
   it("coalesces a burst of changes into a single rescan hint", async () => {

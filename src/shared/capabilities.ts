@@ -124,7 +124,36 @@ export type InstructionFile = {
   /** Path relative to the project root; absolute for global files. */
   relativePath: string;
   bytes: number;
+  /**
+   * `mtimeMs` of the file at scan time. The instruction editor compares it
+   * with the mtime it read the bytes at, so a change made by another tool
+   * surfaces through the ordinary watch → rescan flow. `0` when the file could
+   * not be stat'ed.
+   */
+  mtimeMs: number;
 };
+
+/**
+ * The instruction files AMOS offers to create at the root of a project — one
+ * per ecosystem, exactly where each CLI looks for it.
+ */
+export const ROOT_INSTRUCTION_FILES = [
+  { ecosystem: "claude", name: "CLAUDE.md" },
+  { ecosystem: "codex", name: "AGENTS.md" },
+] as const satisfies readonly { ecosystem: Ecosystem; name: string }[];
+
+/** `true` when the project root already carries that instruction file. */
+export function hasRootInstruction(instructions: InstructionFile[], name: string): boolean {
+  return instructions.some((f) => f.scope === "project" && f.relativePath === name);
+}
+
+/** The scanned instruction file sitting at the project root, if any. */
+export function findRootInstruction(
+  instructions: InstructionFile[],
+  name: string,
+): InstructionFile | undefined {
+  return instructions.find((f) => f.scope === "project" && f.relativePath === name);
+}
 
 /** A directory or file the scanner could not read at all. */
 export type ScanError = {

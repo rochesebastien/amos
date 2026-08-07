@@ -227,5 +227,6 @@ export async function collectInstruction(
     path: filePath,
     relativePath: relativeTo ? toPosix(path.relative(relativeTo, filePath)) : filePath,
     bytes: await fileSize(filePath),
+    mtimeMs: await fileMtimeMs(filePath),
   });
 }

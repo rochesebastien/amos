@@ -12,7 +12,9 @@ import { CODEX_DIR, CODEX_INSTRUCTIONS } from "./codex.js";
  * AMOS never watches a whole project folder — that would mean an inotify
  * handle per source file of somebody's monorepo. It watches only the handful
  * of roots the scanner actually reads, plus the two global folders, which are
- * shared by every open project.
+ * shared by every open project, plus the project root itself — flat, and
+ * filtered to those same few names, because chokidar never adopts a path that
+ * did not exist when it was handed the list.
  *
  * Three things keep the UI calm: a 300 ms debounce per project, so a `git
  * checkout` touching forty files causes one rescan; echo suppression, so the
@@ -36,15 +38,33 @@ export type WatchManagerOptions = {
   usePolling?: boolean;
 };
 
+/** The names, directly under a project root, that a scan reads. */
+export const WATCHED_ROOT_ENTRIES = [
+  CLAUDE_DIR,
+  CODEX_DIR,
+  CLAUDE_MCP_FILE,
+  CLAUDE_INSTRUCTIONS,
+  CODEX_INSTRUCTIONS,
+] as const;
+
 /** The narrow set of project paths a scan actually reads. */
 export function projectWatchPaths(projectRoot: string): string[] {
-  return [
-    path.join(projectRoot, CLAUDE_DIR),
-    path.join(projectRoot, CODEX_DIR),
-    path.join(projectRoot, CLAUDE_MCP_FILE),
-    path.join(projectRoot, CLAUDE_INSTRUCTIONS),
-    path.join(projectRoot, CODEX_INSTRUCTIONS),
-  ];
+  return WATCHED_ROOT_ENTRIES.map((name) => path.join(projectRoot, name));
+}
+
+/**
+ * `true` when `target` is one of those names sitting directly in the root.
+ *
+ * chokidar only ever watches paths that exist when it is handed them, and
+ * never adopts one that appears later. So a `CLAUDE.md` created after the
+ * project was opened — by AMOS's own "Create CLAUDE.md", or by the user in
+ * another editor — would stay invisible until the app restarted. A second,
+ * flat watcher on the project root itself closes that hole, and this predicate
+ * is what keeps it from reporting the rest of somebody's repository.
+ */
+export function isWatchedRootEntry(projectRoot: string, target: string): boolean {
+  if (path.dirname(target) !== projectRoot) return false;
+  return (WATCHED_ROOT_ENTRIES as readonly string[]).includes(path.basename(target));
 }
 
 /** The global capability roots, shared by every open project. */
@@ -68,8 +88,8 @@ export class WatchManager {
     onChange: (event: ScanChangedEvent) => void;
   };
 
-  /** Project id → its own watcher. */
-  private readonly projects = new Map<string, FSWatcher>();
+  /** Project id → its watchers: the scan roots, plus the flat root watcher. */
+  private readonly projects = new Map<string, FSWatcher[]>();
   /** Project id → pending debounce timer. */
   private readonly timers = new Map<string, NodeJS.Timeout>();
   /** Shared watcher on `~/.claude` and `~/.codex`, created with the first project. */
@@ -88,19 +108,27 @@ export class WatchManager {
   /** Watch one project. Watching an already-watched project is a no-op. */
   watch(projectId: string, projectRoot: string): void {
     if (this.closed || this.projects.has(projectId)) return;
-    this.projects.set(
-      projectId,
-      this.createWatcher(projectWatchPaths(projectRoot), () => this.schedule(projectId)),
-    );
+    const root = path.resolve(projectRoot);
+    const onEvent = () => this.schedule(projectId);
+    this.projects.set(projectId, [
+      this.createWatcher(projectWatchPaths(root), onEvent),
+      // Flat, and filtered down to the handful of names a scan reads: this one
+      // is here to notice those names *appearing*, not to watch the project.
+      this.createWatcher([root], onEvent, {
+        depth: 0,
+        ignored: (target: string) =>
+          target !== root && (isIgnoredWatchPath(target) || !isWatchedRootEntry(root, target)),
+      }),
+    ]);
     this.ensureGlobalWatcher();
   }
 
   /** Stop watching one project, and the global roots once none are left. */
   async unwatch(projectId: string): Promise<void> {
-    const watcher = this.projects.get(projectId);
+    const watchers = this.projects.get(projectId) ?? [];
     this.projects.delete(projectId);
     this.cancel(projectId);
-    if (watcher) await watcher.close().catch(() => undefined);
+    await Promise.all(watchers.map((w) => w.close().catch(() => undefined)));
     if (this.projects.size === 0) await this.closeGlobalWatcher();
   }
 
@@ -112,7 +140,7 @@ export class WatchManager {
   async closeAll(): Promise<void> {
     this.closed = true;
     for (const id of [...this.timers.keys()]) this.cancel(id);
-    const watchers = [...this.projects.values()];
+    const watchers = [...this.projects.values()].flat();
     this.projects.clear();
     await Promise.all(watchers.map((w) => w.close().catch(() => undefined)));
     await this.closeGlobalWatcher();
@@ -120,14 +148,18 @@ export class WatchManager {
 
   // ------------------------------------------------------------------ internals
 
-  private createWatcher(paths: string[], onEvent: () => void): FSWatcher {
+  private createWatcher(
+    paths: string[],
+    onEvent: () => void,
+    overrides: { depth?: number; ignored?: (target: string) => boolean } = {},
+  ): FSWatcher {
     const watcher = chokidar.watch(paths, {
       ignoreInitial: true,
       followSymlinks: false,
-      depth: WATCH_DEPTH,
+      depth: overrides.depth ?? WATCH_DEPTH,
       usePolling: this.options.usePolling,
       interval: this.options.usePolling ? 80 : undefined,
-      ignored: (target: string) => isIgnoredWatchPath(target),
+      ignored: overrides.ignored ?? ((target: string) => isIgnoredWatchPath(target)),
     });
     // A watched root that does not exist yet, or that disappears, is normal —
     // most projects have only one of `.claude` and `.codex`.

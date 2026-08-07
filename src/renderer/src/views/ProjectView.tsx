@@ -1,14 +1,29 @@
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
-import { AlertTriangle, FileText, FolderOpen, MessageSquare, Plus, RefreshCw } from "lucide-react";
+import {
+  AlertTriangle,
+  FileText,
+  FolderOpen,
+  MessageSquare,
+  Pencil,
+  Plus,
+  RefreshCw,
+} from "lucide-react";
 import {
   countItems,
   ECOSYSTEMS,
+  findRootInstruction,
+  hasRootInstruction,
+  joinPath,
+  ROOT_INSTRUCTION_FILES,
   type CapabilityKind,
+  type Ecosystem,
   type ProjectScan,
 } from "@shared/capabilities";
-import { useProjects, useProjectScan } from "@/lib/queries";
+import { useProjects, useProjectScan, useWriteFile } from "@/lib/queries";
 import { relativeTime, useT, type TFunc } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
+import { errorText } from "@/components/editors/shell";
 import { EcosystemBadge, KIND_ICONS, ScopeBadge } from "@/components/CapabilityBadges";
 import { cn, formatBytes } from "@/lib/utils";
 
@@ -122,22 +137,37 @@ export function ProjectView() {
           )}
           <ul className="flex flex-col gap-1">
             {scan?.instructions.map((file) => (
-              <li
-                key={file.id}
-                className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm"
-                title={file.path}
-              >
-                <span className="min-w-0 flex-1 truncate font-mono text-[13px]">
-                  {file.relativePath}
-                </span>
-                <span className="shrink-0 text-xs text-muted-foreground/60">
-                  {formatBytes(file.bytes)}
-                </span>
-                <EcosystemBadge ecosystem={file.ecosystem} />
-                <ScopeBadge scope={file.scope} />
+              <li key={file.id}>
+                <Link
+                  to="/p/$projectId/instructions/$fileId"
+                  params={{ projectId, fileId: file.id }}
+                  className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm transition-colors hover:border-primary/40 hover:bg-accent/60"
+                  title={file.path}
+                >
+                  <span className="min-w-0 flex-1 truncate font-mono text-[13px]">
+                    {file.relativePath}
+                  </span>
+                  <span className="shrink-0 text-xs text-muted-foreground/60">
+                    {formatBytes(file.bytes)}
+                  </span>
+                  <EcosystemBadge ecosystem={file.ecosystem} />
+                  <ScopeBadge scope={file.scope} />
+                  <span className="inline-flex shrink-0 items-center gap-1 text-[13px] text-primary">
+                    <Pencil className="size-3.5" />
+                    {t("instructions.edit")}
+                  </span>
+                </Link>
               </li>
             ))}
           </ul>
+          {scan && (
+            <CreateInstructions
+              t={t}
+              projectId={projectId}
+              projectName={project.name}
+              scan={scan}
+            />
+          )}
         </section>
 
         {/* broken files */}
@@ -178,6 +208,86 @@ export function ProjectView() {
           </section>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * "Create CLAUDE.md" / "Create AGENTS.md", offered only for the ones the
+ * project root does not have yet.
+ *
+ * The file is written with the "must not exist" guard the new-capability forms
+ * use, so racing another tool to the same path fails loudly instead of
+ * overwriting it. Where it lands is a convention of each CLI — the root of the
+ * project — so there is nothing to ask the user about, and the editor opens on
+ * the scaffold right away.
+ */
+function CreateInstructions({
+  t,
+  projectId,
+  projectName,
+  scan,
+}: {
+  t: TFunc;
+  projectId: string;
+  projectName: string;
+  scan: ProjectScan;
+}) {
+  const navigate = useNavigate();
+  const scanQuery = useProjectScan(projectId);
+  const write = useWriteFile(projectId);
+  const [error, setError] = useState<unknown>(null);
+  const [pending, setPending] = useState<string | null>(null);
+
+  const missing = ROOT_INSTRUCTION_FILES.filter(
+    (candidate) => !hasRootInstruction(scan.instructions, candidate.name),
+  );
+  if (missing.length === 0) return null;
+
+  const create = async (name: string, ecosystem: Ecosystem) => {
+    setError(null);
+    setPending(name);
+    try {
+      await write.mutateAsync({
+        path: joinPath(scan.projectPath, name),
+        content: t(`instructions.scaffold.${ecosystem}`, { name: projectName }),
+        // Creating over somebody's file is a conflict, not a merge.
+        expectedMtimeMs: null,
+      });
+      const { data } = await scanQuery.refetch();
+      const created = data ? findRootInstruction(data.instructions, name) : undefined;
+      if (created) {
+        void navigate({
+          to: "/p/$projectId/instructions/$fileId",
+          params: { projectId, fileId: created.id },
+        });
+      }
+    } catch (err) {
+      setError(err);
+    } finally {
+      setPending(null);
+    }
+  };
+
+  return (
+    <div className="mt-3">
+      <div className="flex flex-wrap items-center gap-2">
+        {missing.map(({ name, ecosystem }) => (
+          <Button
+            key={name}
+            variant="outline"
+            disabled={pending !== null}
+            onClick={() => void create(name, ecosystem)}
+          >
+            <Plus className="size-4" />
+            {pending === name ? t("common.saving") : t("instructions.create", { name })}
+          </Button>
+        ))}
+      </div>
+      <p className="mt-2 text-[13px] text-muted-foreground/70">{t("instructions.createHint")}</p>
+      {error != null && (
+        <p className="mt-2 text-[13px] text-destructive">{errorText(error)}</p>
+      )}
     </div>
   );
 }

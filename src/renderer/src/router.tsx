@@ -14,6 +14,7 @@ import { SettingsLayout } from "@/views/settings/SettingsLayout";
 import { WelcomeView } from "@/views/WelcomeView";
 import { ProjectView } from "@/views/ProjectView";
 import { ItemView } from "@/views/ItemView";
+import { InstructionView } from "@/views/InstructionView";
 import { NewItemView } from "@/views/NewItemView";
 import { ChatView } from "@/views/ChatView";
 import { GeneralSettings } from "@/views/settings/GeneralSettings";
@@ -73,6 +74,13 @@ const itemRoute = createRoute({
   component: ItemView,
 });
 
+/** Editor for one `CLAUDE.md` / `AGENTS.md` the scan found. */
+const instructionRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/p/$projectId/instructions/$fileId",
+  component: InstructionView,
+});
+
 /** Create a new agent / skill / MCP server. `$kind` is one of those three. */
 const newItemRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -114,6 +122,7 @@ const routeTree = rootRoute.addChildren([
   chatRoute,
   chatSessionRoute,
   itemRoute,
+  instructionRoute,
   newItemRoute,
   settingsRoute.addChildren([settingsIndexRoute, generalSettingsRoute, backendsSettingsRoute]),
 ]);
