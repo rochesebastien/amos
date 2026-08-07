@@ -1,0 +1,122 @@
+appId: com.amos.app
+productName: AMOS
+copyright: Copyright © 2026 AMOS
+
+directories:
+  buildResources: build
+  output: release/${version}
+
+# `out/**` is the electron-vite bundle (main is ESM — package.json must ship for
+# its `"type": "module"`). Production dependencies are pulled in automatically;
+# only the externalised ones (better-sqlite3, chokidar, gray-matter, smol-toml,
+# zod, @anthropic-ai/claude-agent-sdk) actually end up there.
+# Listing positive patterns already excludes everything else at the app root
+# (src/, tests/, build/, scripts/, the configs) — do NOT add `!**/build` style
+# negations here: they also match `node_modules/better-sqlite3/build/`, which is
+# where the compiled `.node` lives, and the app then ships without its database.
+# The negations below are node_modules slimming only.
+files:
+  - out/**
+  - package.json
+  - "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme,test,__tests__,tests,powered-test,example,examples,.github}"
+  - "!**/node_modules/.bin"
+  - "!**/*.{o,a,obj,lib,map,ts,tsx}"
+  # better-sqlite3 compiles from a vendored amalgamation; the sources are ~10 MB
+  # and useless once build/Release/better_sqlite3.node exists.
+  - "!**/node_modules/better-sqlite3/{deps,src}${/*}"
+  - "!**/node_modules/better-sqlite3/build/{Release/obj,Release/obj.target,deps,*.mk,Makefile,*.gypi,config.gypi,binding.Makefile}${/*}"
+  # `@anthropic-ai/claude-agent-sdk-<platform>` is a 280 MB optional dependency
+  # that vendors a whole `claude` binary, and it is the SDK's fallback only when
+  # `pathToClaudeCodeExecutable` is absent. AMOS always supplies it: the chat
+  # manager refuses to build a driver unless detection found the user's own CLI
+  # (chat/manager.ts — `if (!status.installed || !status.path) …`) and the driver
+  # itself refuses the turn if it was somehow built without a path
+  # (chat/claudeDriver.ts — CLAUDE_BINARY_REQUIRED), so the vendored copy is
+  # unreachable by construction. Worse, npm only installs the optional package
+  # for the *build host*, so keeping it would ship the wrong platform's binary
+  # on a cross-built Windows or macOS artifact. Verified by packaging without it
+  # and running a real `claude` turn from the unpacked app.
+  # The glob is anchored on the scope and on the trailing `-`: the SDK proper is
+  # `@anthropic-ai/claude-agent-sdk` (no hyphen) and stays. Do NOT loosen this
+  # into a bare `!**/claude-agent-sdk-*` — see the P5 lesson above.
+  - "!**/node_modules/@anthropic-ai/claude-agent-sdk-*${/*}"
+  # The SDK also ships subpath entry points AMOS never imports. `browser-sdk.js`
+  # (1.2 MB) is the `./browser` export: a build for browser environments, which
+  # by definition cannot spawn a CLI, so the Electron main process can never
+  # want it. Nothing in `sdk.mjs` references it either — its only dynamic
+  # imports are `node:fs`, `node:path` and `node:buffer`. Confirmed by deleting
+  # it and running a real turn. `bridge.mjs` (1.1 MB) is left in place: equally
+  # unimported today, but it backs SDK features (in-process MCP servers, the
+  # remote-control bridge) a future AMOS could reach for, and 1.1 MB out of a
+  # 306 MB tree is not worth that bet.
+  - "!**/node_modules/@anthropic-ai/claude-agent-sdk/browser-sdk.js"
+
+asar: true
+# better-sqlite3 is a native module: its .node binary cannot be loaded from
+# inside the asar archive, and neither can the loader that resolves it. Unpack
+# the whole package rather than just `**/*.node`, so bindings resolution finds
+# build/Release/ on disk where it expects it.
+asarUnpack:
+  - resources/**
+  - "**/*.node"
+  - "**/node_modules/better-sqlite3/**"
+
+# The native module is compiled against Electron's ABI at package time.
+# `npm install` does the same via the postinstall hook (scripts/native-deps.mjs,
+# which wraps `electron-builder install-app-deps` plus a @electron/rebuild cache
+# wipe that install-app-deps alone does not do).
+npmRebuild: true
+
+# Icons come from directories.buildResources: build/icon.png (1024²) feeds
+# Windows and macOS, build/icons/*.png feeds Linux. Regenerate them with
+# `node scripts/gen-icons.mjs`.
+
+# x64 only for now: arm64 would require cross-compiling better-sqlite3 with
+# the MSVC ARM64 toolchain on the CI runner, which is not guaranteed to be
+# present. Revisit once a Windows-on-ARM build can actually be tested.
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: ${productName}-${version}-${arch}-setup.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  shortcutName: AMOS
+  uninstallDisplayName: AMOS
+
+mac:
+  target:
+    # dmg to install by hand, zip because that is what auto-update consumes.
+    - target: dmg
+      arch: [x64, arm64]
+    - target: zip
+      arch: [x64, arm64]
+  category: public.app-category.developer-tools
+  artifactName: ${productName}-${version}-${arch}.${ext}
+  # AMOS drives the claude/codex CLIs as child processes; the hardened runtime
+  # kills that without these entitlements once the app is signed & notarised.
+  # `entitlements` covers the app binary itself, `entitlementsInherit` the
+  # bundled helper processes — both must point at the project's plist or the
+  # main executable silently falls back to electron-builder's default one.
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+
+dmg:
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+# AppImage is the one Linux format that runs everywhere without a package
+# manager, which is what CI publishes. `npx electron-builder --linux dir`
+# overrides this for a quick local check: the unpacked tree is enough to prove
+# the packaging config, and it skips downloading the AppImage runtime.
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+  category: Development
+  synopsis: Manage the agents, skills and MCP servers of your projects
+  artifactName: ${productName}-${version}-${arch}.${ext}

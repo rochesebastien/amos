@@ -1,0 +1,141 @@
+# AMOS — tests on every push/PR, installers for the three desktop OSes on main.
+#
+# Two jobs:
+#   test   ubuntu only, the whole vitest suite plus tsc. Runs on PRs too.
+#   build  windows/macos/ubuntu matrix, gated on `test`, packages with
+#          electron-builder and uploads the installers as run artifacts.
+#
+# Code signing is wired but optional: with no certificate secret configured the
+# packaging step still succeeds and simply produces unsigned artifacts. See
+# "CI & releases" in README.md for the secret names.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `npm ci` runs the postinstall hook, which compiles better-sqlite3 for
+      # Electron's ABI; `npm test` then swaps it back to the Node ABI itself
+      # (scripts/native-deps.mjs). Both directions are exercised on purpose —
+      # that swap is the fragile part of this repo's setup.
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - run: npm test
+
+  build:
+    name: Build ${{ matrix.label }}
+    needs: test
+    # Forks cannot read secrets, and unsigned installers from a PR are not worth
+    # ~15 minutes of matrix time. Packaging runs on main and on demand.
+    if: github.event_name != 'pull_request'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            label: Linux
+            artifact: amos-linux
+            # AppImage, per electron-builder.yml.
+            files: |
+              release/*/*.AppImage
+          - os: windows-latest
+            label: Windows
+            artifact: amos-windows
+            files: |
+              release/*/*.exe
+              release/*/*.blockmap
+          - os: macos-latest
+            label: macOS
+            artifact: amos-macos
+            files: |
+              release/*/*.dmg
+              release/*/*.zip
+              release/*/*.blockmap
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # postinstall = `node scripts/native-deps.mjs electron`, i.e. the same
+      # `electron-builder install-app-deps` the packaging step needs.
+      - run: npm ci
+
+      - name: Build renderer + main bundles
+        run: npm run build
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: npx electron-builder --linux --publish never
+
+      # Secrets are unavailable to `if:` expressions, so they are surfaced as
+      # env first and tested through the env context. With no certificate the
+      # variables are empty, electron-builder logs "skipped … code signing" and
+      # produces an unsigned installer.
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+        run: |
+          if [ -z "$CSC_LINK" ]; then
+            echo "::notice::WIN_CSC_LINK is not set — building an unsigned installer."
+            unset CSC_LINK CSC_KEY_PASSWORD
+          fi
+          npx electron-builder --win --publish never
+
+      # Notarisation is driven purely by APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD
+      # / APPLE_TEAM_ID and only happens after a successful signature, so the
+      # three are exported together with the certificate and dropped with it.
+      # Without a certificate, CSC_IDENTITY_AUTO_DISCOVERY=false keeps
+      # electron-builder from hunting through the runner keychain.
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -z "$CSC_LINK" ]; then
+            echo "::notice::MAC_CSC_LINK is not set — building an unsigned, un-notarised app."
+            unset CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID
+            export CSC_IDENTITY_AUTO_DISCOVERY=false
+          elif [ -z "$APPLE_ID" ]; then
+            echo "::notice::APPLE_ID is not set — signing without notarisation."
+          fi
+          npx electron-builder --mac --publish never
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error
+          retention-days: 14

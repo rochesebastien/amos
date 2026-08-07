@@ -1,13 +1,8 @@
-# Python
-__pycache__/
-*.py[cod]
-.venv/
-venv/
-*.egg-info/
-.pytest_cache/
+# Local databases (the real one lives in the OS userData dir)
 *.db
 *.sqlite3
-backend/cheveluai.db
+*.db-wal
+*.db-shm
 
 # Node
 node_modules/
@@ -15,6 +10,12 @@ dist/
 dist-ssr/
 *.local
 .vite/
+
+# Electron
+out/
+release/
+electron.vite.config.*.mjs
+electron.vite.config.*.cjs
 
 # Env
 .env

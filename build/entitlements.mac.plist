@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <!-- Electron's renderer needs JIT and writable-executable memory. -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <!-- better-sqlite3 and the claude-agent-sdk load .node binaries that are
+         not signed by us. -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+    <true/>
+    <!-- No com.apple.security.inherit here: it is only valid for children of
+         an app-sandboxed process, and AMOS does not enable the app sandbox.
+         Spawning the user's own `claude` / `codex` CLI needs no entitlement
+         on a non-sandboxed (hardened-runtime-only) app. -->
+  </dict>
+</plist>

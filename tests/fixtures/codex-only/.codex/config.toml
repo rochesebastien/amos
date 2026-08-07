@@ -1,0 +1,13 @@
+model = "gpt-5-codex"
+approval_policy = "on-request"
+
+[mcp_servers.filesystem]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-filesystem", "."]
+
+[mcp_servers.filesystem.env]
+ROOT = "/srv"
+
+[mcp_servers.remote]
+url = "https://remote.example.com/mcp"
+bearer_token_env_var = "REMOTE_TOKEN"

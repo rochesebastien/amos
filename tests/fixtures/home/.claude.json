@@ -1,0 +1,13 @@
+{
+  "numStartups": 12,
+  "mcpServers": {
+    "global-http": { "type": "http", "url": "https://global.example.com/mcp" }
+  },
+  "projects": {
+    "/somewhere/else": {
+      "mcpServers": {
+        "not-global": { "command": "should-be-ignored" }
+      }
+    }
+  }
+}

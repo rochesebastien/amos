@@ -1,8 +1,9 @@
-# DESIGN.md — CheveluAI
+# DESIGN.md — AMOS
 
-Visual identity & design system for the CheveluAI frontend. Adapted from a flat,
-light-first system (Tailwind CSS v4, CSS-first config in `src/index.css`,
-shadcn-style primitives) with a CheveluAI palette and typeface.
+Visual identity & design system for the AMOS renderer
+(`src/renderer/src/`). Adapted from a flat, light-first system (Tailwind CSS v4,
+CSS-first config in `src/renderer/src/index.css`, shadcn-style primitives) with
+the AMOS palette and typeface.
 
 ## Direction
 
@@ -15,18 +16,18 @@ or animation.
 
 - No frosted glass, ambient glow, neumorphism, or skeuomorphic depth.
 - No stacked/heavy shadows. Surfaces are flat; elevation is a hairline border.
-- No Inter / Roboto / system-font look — CheveluAI is **Mona Sans** everywhere.
+- No Inter / Roboto / system-font look — AMOS is **Mona Sans** everywhere.
 - No scattered micro-interactions.
 - No second brand hue. Green is the only accent (disciplined exceptions below).
 
 ## Tokens
 
-All tokens live in **`src/index.css`** as CSS custom properties, exposed to
+All tokens live in **`src/renderer/src/index.css`** as CSS custom properties, exposed to
 Tailwind via `@theme inline`. Use the utility names (`bg-background`,
 `text-muted-foreground`, `border-border`, `bg-primary`…) — **never hardcode a
 color** in components.
 
-### Color — the CheveluAI palette
+### Color — the AMOS palette
 
 Three brand literals drive everything:
 
@@ -85,7 +86,7 @@ main area is `min-h-0 flex-1 overflow-y-auto`.
 ## Typography
 
 One variable typeface: **Mona Sans** (open source, loaded via `@font-face` from
-`src/assets/fonts`). Two registers:
+`src/renderer/src/assets/fonts`). Two registers:
 
 - **Display / large text** — Mona Sans **ExtraBold** (`font-weight: 800`),
   `tracking-tight`. View titles: `font-display text-3xl`.
@@ -93,6 +94,29 @@ One variable typeface: **Mona Sans** (open source, loaded via `@font-face` from
 
 Section labels: `text-[11px] font-semibold uppercase tracking-wider
 text-muted-foreground/60`. Field labels: `text-[13px] text-muted-foreground`.
+
+## Brand mark
+
+The AMOS identity is deliberately minimal: an **orchestration glyph** — one hub
+node wired to three satellites, standing for the app driving a project's agents,
+skills and MCP servers.
+
+It exists twice, on purpose:
+
+- **`components/Logo.tsx`** — the in-app marks, drawn as inline SVG so they
+  follow the theme. The wires and satellites take `currentColor`, the hub takes
+  `fill-primary`. `LogoMark` is the glyph alone (sidebar rail, message avatars,
+  empty states); `LogoWordmark` pairs it with the product name in
+  `font-display`, and replaces what used to be two baked-in wordmark PNGs.
+- **`assets/logo.svg`** — the same geometry with fixed brand colours on a
+  rounded navy tile, for the favicon and as the source of the packaged app
+  icons. `node scripts/gen-icons.mjs` rasterises it into `build/icon.png`
+  (1024²) and `build/icons/*.png`; the geometry is duplicated in that script and
+  has to be kept in step by hand.
+
+These are placeholders, in the sense that they are geometric rather than
+designed — but they are made of the palette above and should be replaced as a
+set, not patched.
 
 ## Layout
 
@@ -108,8 +132,10 @@ Root: `flex h-screen w-screen overflow-hidden bg-background text-foreground`.
 └────────────┴─────────────────────────────────────┘
 ```
 
-- **Sidebar** (`bg-sidebar`): brand → New chat → nav (Chat / Projects / MCPs) →
-  conversation list → foot (Settings, theme).
+- **Sidebar** (`bg-sidebar`): wordmark → nav (Home) → the project list, each
+  project a clickable name plus a chevron unfolding its Agents / Skills / MCP
+  servers with ecosystem + scope badges → foot (Settings, theme). Collapses to a
+  56px rail that keeps the glyph and icon-only nav.
 - **Main** (`flex min-w-0 flex-1 flex-col`): one view; header is
   `h1.font-display.text-3xl` + optional `text-muted-foreground/70` subtitle.
 
@@ -121,7 +147,7 @@ select, badge, switch, tabs, dropdown). Active nav item:
 `border-ring ring-1 ring-ring`.
 
 **AI components.** The chat surface uses the shadcn AI-usage components, also in
-`components/ui/`, themed to the CheveluAI palette:
+`components/ui/`, themed to the AMOS palette:
 
 - `message` — row layout (avatar, alignment, header, footer) for a turn.
 - `bubble` — the framed message surface (variants incl. `ghost` for assistant
@@ -133,7 +159,7 @@ select, badge, switch, tabs, dropdown). Active nav item:
 - `message-scroller` — the chat transcript scroller. The scroll behavior
   (anchored turns, follow-the-live-edge, open-at-last-anchor, jump-to-latest)
   comes from the headless `@shadcn/react` package; the file in `components/ui/`
-  is the styled frame themed to the CheveluAI tokens. Installs with
+  is the styled frame themed to the AMOS tokens. Installs with
   `legacy-peer-deps` (see `.npmrc`) since the project is on React 18.
 
 ## Animation
