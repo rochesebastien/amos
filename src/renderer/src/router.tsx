@@ -8,10 +8,12 @@ import {
   useRouterState,
 } from "@tanstack/react-router";
 import { Sidebar } from "@/components/Sidebar";
+import { ScanSync } from "@/components/ScanSync";
 import { SettingsLayout } from "@/views/settings/SettingsLayout";
 import { WelcomeView } from "@/views/WelcomeView";
 import { ProjectView } from "@/views/ProjectView";
 import { ItemView } from "@/views/ItemView";
+import { NewItemView } from "@/views/NewItemView";
 import { GeneralSettings } from "@/views/settings/GeneralSettings";
 
 function RootShell() {
@@ -21,6 +23,7 @@ function RootShell() {
   });
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
+      <ScanSync />
       {!onSettings && <Sidebar />}
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Outlet />
@@ -45,11 +48,18 @@ const projectRoute = createRoute({
   component: ProjectView,
 });
 
-/** Read-only detail of one agent / skill / MCP server of a project. */
+/** Editor for one agent / skill / MCP server of a project. */
 const itemRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/p/$projectId/item/$itemId",
   component: ItemView,
+});
+
+/** Create a new agent / skill / MCP server. `$kind` is one of those three. */
+const newItemRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/p/$projectId/new/$kind",
+  component: NewItemView,
 });
 
 // --- Settings: layout route with its own sub-sidebar + nested sections -------
@@ -78,6 +88,7 @@ const routeTree = rootRoute.addChildren([
   welcomeRoute,
   projectRoute,
   itemRoute,
+  newItemRoute,
   settingsRoute.addChildren([settingsIndexRoute, generalSettingsRoute]),
 ]);
 

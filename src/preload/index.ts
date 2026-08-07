@@ -1,5 +1,12 @@
-import { contextBridge, ipcRenderer } from "electron";
-import type { AmosApi, IpcChannel, IpcRequest, IpcResponse } from "../shared/ipc.js";
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
+import type {
+  AmosApi,
+  IpcChannel,
+  IpcEventChannel,
+  IpcEventMap,
+  IpcRequest,
+  IpcResponse,
+} from "../shared/ipc.js";
 
 /**
  * The only bridge between the sandboxed renderer and the main process.
@@ -8,6 +15,22 @@ import type { AmosApi, IpcChannel, IpcRequest, IpcResponse } from "../shared/ipc
  */
 function invoke<C extends IpcChannel>(channel: C, payload?: IpcRequest<C>): Promise<IpcResponse<C>> {
   return ipcRenderer.invoke(channel, payload) as Promise<IpcResponse<C>>;
+}
+
+/**
+ * Subscribe to a main → renderer push channel. The raw `IpcRendererEvent` is
+ * deliberately dropped: it carries a `sender` the renderer has no business
+ * holding. The returned function is the only way to unsubscribe.
+ */
+function subscribe<C extends IpcEventChannel>(
+  channel: C,
+  listener: (payload: IpcEventMap[C]) => void,
+): () => void {
+  const handler = (_event: IpcRendererEvent, payload: IpcEventMap[C]) => listener(payload);
+  ipcRenderer.on(channel, handler);
+  return () => {
+    ipcRenderer.removeListener(channel, handler);
+  };
 }
 
 const amos: AmosApi = {
@@ -23,6 +46,18 @@ const amos: AmosApi = {
   },
   scan: {
     project: (input) => invoke("scan:project", input),
+    watch: (input) => invoke("scan:watch", input),
+    unwatch: (input) => invoke("scan:unwatch", input),
+    onChanged: (listener) => subscribe("scan:changed", listener),
+  },
+  fs: {
+    readFile: (input) => invoke("fs:readFile", input),
+    writeFile: (input) => invoke("fs:writeFile", input),
+    listDir: (input) => invoke("fs:listDir", input),
+  },
+  cap: {
+    saveAgent: (input) => invoke("cap:saveAgent", input),
+    saveMcp: (input) => invoke("cap:saveMcp", input),
   },
   settings: {
     get: (input) => invoke("settings:get", input),

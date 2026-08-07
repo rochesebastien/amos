@@ -498,11 +498,23 @@ function CapabilitySection({
 }) {
   const Icon = KIND_ICONS[kind];
   return (
-    <div className="py-0.5">
+    <div className="group/section py-0.5">
       <div className="flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
         <Icon className="size-3" />
         <span className="truncate">{label}</span>
         <span className="text-muted-foreground/40">{items.length}</span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Link
+              to="/p/$projectId/new/$kind"
+              params={{ projectId, kind }}
+              className="ml-auto rounded p-0.5 opacity-0 transition-opacity hover:bg-sidebar-accent hover:text-foreground group-hover/section:opacity-100"
+            >
+              <Plus className="size-3" />
+            </Link>
+          </TooltipTrigger>
+          <TooltipContent side="right">{t(`new.title.${kind}`)}</TooltipContent>
+        </Tooltip>
       </div>
       {items.length === 0 ? (
         <p className="px-2 pb-0.5 pl-4 text-[12px] text-muted-foreground/50">

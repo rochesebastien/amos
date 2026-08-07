@@ -1,8 +1,8 @@
 import os from "node:os";
 import path from "node:path";
-import type { CapabilityItem, ProjectScan } from "../../shared/capabilities.js";
-import { scanClaudeGlobal, scanClaudeProject } from "./claude.js";
-import { scanCodexGlobal, scanCodexProject } from "./codex.js";
+import type { CapabilityItem, CapabilityTarget, ProjectScan } from "../../shared/capabilities.js";
+import { CLAUDE_DIR, CLAUDE_MCP_FILE, scanClaudeGlobal, scanClaudeProject } from "./claude.js";
+import { CODEX_CONFIG_FILE, CODEX_DIR, scanCodexGlobal, scanCodexProject } from "./codex.js";
 import { isDirectory, mergeChunks } from "./fsutil.js";
 
 export type ScanOptions = {
@@ -37,6 +37,7 @@ export async function scanProject(
     items: [],
     instructions: [],
     errors: [],
+    targets: capabilityTargets(root, home, includeGlobal),
   };
 
   if (!(await isDirectory(root))) {
@@ -54,6 +55,67 @@ export async function scanProject(
   scan.instructions = merged.instructions;
   scan.errors = merged.errors;
   return scan;
+}
+
+/**
+ * Where a new agent / skill / MCP server of each ecosystem × scope has to go.
+ *
+ * These are conventions, not discoveries: the folders need not exist yet — the
+ * first save creates them. Codex has no per-ecosystem agent folder (its agent
+ * instructions live in `AGENTS.md` files), hence the `null`.
+ */
+export function capabilityTargets(
+  projectRoot: string,
+  home: string,
+  includeGlobal = true,
+): CapabilityTarget[] {
+  const targets: CapabilityTarget[] = [
+    {
+      ecosystem: "claude",
+      scope: "project",
+      root: projectRoot,
+      agentsDir: path.join(projectRoot, CLAUDE_DIR, "agents"),
+      skillsDir: path.join(projectRoot, CLAUDE_DIR, "skills"),
+      mcpFile: path.join(projectRoot, CLAUDE_MCP_FILE),
+      mcpFormat: "json",
+    },
+    {
+      ecosystem: "codex",
+      scope: "project",
+      root: projectRoot,
+      agentsDir: null,
+      skillsDir: path.join(projectRoot, CODEX_DIR, "skills"),
+      mcpFile: path.join(projectRoot, CODEX_DIR, CODEX_CONFIG_FILE),
+      mcpFormat: "toml",
+    },
+  ];
+
+  if (includeGlobal) {
+    targets.push(
+      {
+        ecosystem: "claude",
+        scope: "global",
+        root: home,
+        agentsDir: path.join(home, CLAUDE_DIR, "agents"),
+        skillsDir: path.join(home, CLAUDE_DIR, "skills"),
+        // The global Claude servers live at the top level of `~/.claude.json`,
+        // not in `~/.claude/`.
+        mcpFile: path.join(home, ".claude.json"),
+        mcpFormat: "json",
+      },
+      {
+        ecosystem: "codex",
+        scope: "global",
+        root: home,
+        agentsDir: null,
+        skillsDir: path.join(home, CODEX_DIR, "skills"),
+        mcpFile: path.join(home, CODEX_DIR, CODEX_CONFIG_FILE),
+        mcpFormat: "toml",
+      },
+    );
+  }
+
+  return targets;
 }
 
 /** Display order: project first, then kind, ecosystem and name. */

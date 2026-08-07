@@ -1,5 +1,5 @@
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
-import { AlertTriangle, FileText, FolderOpen, RefreshCw } from "lucide-react";
+import { AlertTriangle, FileText, FolderOpen, Plus, RefreshCw } from "lucide-react";
 import {
   countItems,
   ECOSYSTEMS,
@@ -92,7 +92,14 @@ export function ProjectView() {
 
         <div className="grid max-w-4xl gap-4 sm:grid-cols-3">
           {SECTIONS.map(({ kind, labelKey }) => (
-            <KindCard key={kind} t={t} kind={kind} label={t(labelKey)} scan={scan} />
+            <KindCard
+              key={kind}
+              t={t}
+              projectId={projectId}
+              kind={kind}
+              label={t(labelKey)}
+              scan={scan}
+            />
           ))}
         </div>
 
@@ -167,14 +174,16 @@ export function ProjectView() {
   );
 }
 
-/** Counts for one kind: total, per ecosystem, and project vs global. */
+/** Counts for one kind: total, per ecosystem, project vs global — and a way in. */
 function KindCard({
   t,
+  projectId,
   kind,
   label,
   scan,
 }: {
   t: TFunc;
+  projectId: string;
   kind: CapabilityKind;
   label: string;
   scan: ProjectScan | undefined;
@@ -211,6 +220,14 @@ function KindCard({
           </p>
         </div>
       )}
+      <Link
+        to="/p/$projectId/new/$kind"
+        params={{ projectId, kind }}
+        className="mt-3 inline-flex items-center gap-1.5 text-[13px] text-primary transition-opacity hover:opacity-80"
+      >
+        <Plus className="size-3.5" />
+        {t(`new.title.${kind}`)}
+      </Link>
     </section>
   );
 }

@@ -94,6 +94,12 @@ type CapabilityBase = {
   /** The file AMOS parsed to find this item, and the one it will write back. */
   sourceFile: string;
   /**
+   * `mtimeMs` of `sourceFile` at scan time. Editors send it back as
+   * `expectedMtimeMs` so a save can refuse to clobber a file another tool
+   * touched in the meantime. `0` when the file could not be stat'ed.
+   */
+  mtimeMs: number;
+  /**
    * Set when the declaring file could not be parsed. `data` is then `null`
    * and the UI shows the item as broken instead of hiding it.
    */
@@ -127,6 +133,31 @@ export type ScanError = {
   message: string;
 };
 
+/**
+ * Where a *new* capability of a given ecosystem and scope has to be written.
+ *
+ * The renderer has no filesystem and no `os.homedir()`, so the scanner hands
+ * it the four conventional locations of each ecosystem × scope pair. This is
+ * what the "new agent / new skill / new MCP server" forms build paths from.
+ */
+export type CapabilityTarget = {
+  ecosystem: Ecosystem;
+  scope: Scope;
+  /** Project folder for `project` scope, home folder for `global` scope. */
+  root: string;
+  /** Folder holding agent `.md` files — `null` for Codex, which has none. */
+  agentsDir: string | null;
+  /** Folder holding `<name>/SKILL.md` skill folders. */
+  skillsDir: string;
+  /** Config file declaring the MCP servers of this ecosystem × scope. */
+  mcpFile: string;
+  /** How that config file is encoded. */
+  mcpFormat: McpFormat;
+};
+
+/** Encoding of an MCP config file: `.mcp.json` vs `config.toml`. */
+export type McpFormat = "json" | "toml";
+
 /** Everything one `scan:project` call returns. */
 export type ProjectScan = {
   /** Absolute path the scan ran against. */
@@ -137,6 +168,8 @@ export type ProjectScan = {
   instructions: InstructionFile[];
   /** Unreadable paths — surfaced, never swallowed. */
   errors: ScanError[];
+  /** Where to create new capabilities, one entry per ecosystem × scope. */
+  targets: CapabilityTarget[];
 };
 
 // ----------------------------------------------------------------------- ids
@@ -185,6 +218,33 @@ export function countItems(
       (filter.ecosystem === undefined || i.ecosystem === filter.ecosystem) &&
       (filter.scope === undefined || i.scope === filter.scope),
   ).length;
+}
+
+/** The target for one ecosystem × scope pair, or `undefined` when not scanned. */
+export function findTarget(
+  targets: CapabilityTarget[],
+  ecosystem: Ecosystem,
+  scope: Scope,
+): CapabilityTarget | undefined {
+  return targets.find((t) => t.ecosystem === ecosystem && t.scope === scope);
+}
+
+/**
+ * Join a folder and a child with `/`. The renderer has no `path` module, and
+ * every path AMOS hands it is already absolute and native — appending with a
+ * forward slash is understood by both Windows and POSIX.
+ */
+export function joinPath(dir: string, ...parts: string[]): string {
+  return [dir.replace(/[/\\]+$/, ""), ...parts].join("/");
+}
+
+/**
+ * Names AMOS is willing to create files and folders from: no separators, no
+ * dot-prefix, no traversal. Rejecting here keeps the "new capability" forms
+ * from ever proposing a path the main process would refuse.
+ */
+export function isSafeName(name: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name) && !name.includes("..") && name.length <= 100;
 }
 
 /** Items of one kind, ordered for display: project before global, then name. */

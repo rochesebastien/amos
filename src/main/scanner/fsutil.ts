@@ -69,6 +69,18 @@ export async function fileSize(target: string): Promise<number> {
 }
 
 /**
+ * Modification time in ms, or 0 when the file vanished mid-scan. Editors send
+ * it back as `expectedMtimeMs`, so 0 simply means "no conflict token".
+ */
+export async function fileMtimeMs(target: string): Promise<number> {
+  try {
+    return (await fs.stat(target)).mtimeMs;
+  } catch {
+    return 0;
+  }
+}
+
+/**
  * Read a UTF-8 file. Returns `null` when the file does not exist; records a
  * `ScanError` and returns `null` for any other failure (permissions, …).
  */

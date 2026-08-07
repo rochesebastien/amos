@@ -7,7 +7,7 @@
  * the sandboxed renderer as well.
  */
 
-import type { ProjectScan } from "./capabilities.js";
+import type { McpTransport, ProjectScan } from "./capabilities.js";
 
 // ---------------------------------------------------------------- data model
 
@@ -39,6 +39,133 @@ export type PickFolderResult = { path: string | null };
 /** A single row of the `settings` key/value table. */
 export type SettingValue = { key: string; value: string | null };
 
+// ------------------------------------------------------------------ file i/o
+
+/** One entry of a `fs:listDir` listing. */
+export type FsEntry = {
+  /** Basename. */
+  name: string;
+  /** Path relative to the listed directory, with `/` separators. */
+  relativePath: string;
+  /** Absolute path. */
+  path: string;
+  kind: "file" | "directory";
+  /** Size in bytes; `0` for directories. */
+  bytes: number;
+};
+
+export type ReadFileResult = {
+  path: string;
+  content: string;
+  /** Modification time when the content was read — the save's conflict token. */
+  mtimeMs: number;
+  bytes: number;
+};
+
+export type WriteFileResult = {
+  path: string;
+  /** Modification time after the write, to keep editing without a re-read. */
+  mtimeMs: number;
+  bytes: number;
+  /** The `.bak` copy of the previous content, or `null` for a new file. */
+  backupPath: string | null;
+};
+
+export type ListDirResult = {
+  path: string;
+  entries: FsEntry[];
+  /** `true` when the listing hit the entry cap and is therefore partial. */
+  truncated: boolean;
+};
+
+// --------------------------------------------------------------- capabilities
+
+/** Which markdown document `cap:saveAgent` is writing. */
+export type CapabilityDocument = "agent" | "skill";
+
+/**
+ * The frontmatter keys AMOS's forms know about. A key left out is not touched
+ * on disk; a key set to `null` or `""` is removed. Everything else in the file
+ * survives untouched — the merge happens in the main process, against the
+ * bytes currently on disk.
+ */
+export type FrontmatterFields = {
+  name?: string | null;
+  description?: string | null;
+  model?: string | null;
+  tools?: string[] | null;
+};
+
+export type SaveAgentRequest = {
+  document: CapabilityDocument;
+  /** Absolute path of the `.md` file (a skill's is its `SKILL.md`). */
+  filePath: string;
+  fields: FrontmatterFields;
+  body: string;
+  /**
+   * `undefined` skips the check (an explicit overwrite), a number requires the
+   * file to still carry that mtime, `null` requires the file not to exist yet.
+   */
+  expectedMtimeMs?: number | null;
+};
+
+/** The MCP entry keys the editor owns; everything else in the entry survives. */
+export type McpFields = {
+  transport: McpTransport;
+  command: string | null;
+  args: string[];
+  env: Record<string, string>;
+  url: string | null;
+  headers: Record<string, string>;
+};
+
+export type SaveMcpRequest = {
+  /** Absolute path of the `.mcp.json` / `~/.claude.json` / `config.toml`. */
+  sourceFile: string;
+  /** Server key to write. */
+  name: string;
+  /** Key currently in the file, when renaming. */
+  previousName?: string;
+  /** Omitted together with `remove: true`. */
+  fields?: McpFields;
+  /** Delete the entry instead of writing it. */
+  remove?: boolean;
+  expectedMtimeMs?: number | null;
+};
+
+export type SaveCapabilityResult = {
+  path: string;
+  mtimeMs: number;
+  backupPath: string | null;
+  /**
+   * `true` when the rewritten document was TOML that carried comments: the
+   * TOML serialiser cannot keep them, so the UI has to say so.
+   */
+  commentsLost: boolean;
+};
+
+/**
+ * Marker carried in the message of a rejected save. Electron flattens a thrown
+ * error to its message across the bridge, so the sentinel — not a class — is
+ * what the renderer matches on to open its conflict dialog.
+ */
+export const WRITE_CONFLICT_CODE = "AMOS_WRITE_CONFLICT";
+
+/** Marker of a path the main process refused to read or write. */
+export const PATH_DENIED_CODE = "AMOS_PATH_DENIED";
+
+/** `true` when a rejected IPC call failed the mtime check. */
+export function isWriteConflict(error: unknown): boolean {
+  return error instanceof Error && error.message.includes(WRITE_CONFLICT_CODE);
+}
+
+/** Payload of the `scan:changed` push: something under a watched root moved. */
+export type ScanChangedEvent = {
+  projectId: string;
+  /** ISO-8601 timestamp of the debounced change. */
+  at: string;
+};
+
 // ------------------------------------------------------------ invoke channels
 
 /** Request/response shape of every `ipcRenderer.invoke` channel. */
@@ -63,6 +190,25 @@ export type IpcInvokeMap = {
    * servers. Never cached in the database: the filesystem is the truth.
    */
   "scan:project": { request: { projectId: string }; response: ProjectScan };
+  /** Start watching a project's capability roots; pushes `scan:changed`. */
+  "scan:watch": { request: { projectId: string }; response: { ok: true } };
+  /** Stop watching a project. Idempotent. */
+  "scan:unwatch": { request: { projectId: string }; response: { ok: true } };
+
+  /** Read a UTF-8 file inside an allowed root. */
+  "fs:readFile": { request: { path: string }; response: ReadFileResult };
+  /** Atomically replace a UTF-8 file inside an allowed root. */
+  "fs:writeFile": {
+    request: { path: string; content: string; expectedMtimeMs?: number | null };
+    response: WriteFileResult;
+  };
+  /** Recursively list a directory inside an allowed root. */
+  "fs:listDir": { request: { path: string; maxDepth?: number }; response: ListDirResult };
+
+  /** Write an agent `.md` (or a `SKILL.md`), preserving unknown frontmatter. */
+  "cap:saveAgent": { request: SaveAgentRequest; response: SaveCapabilityResult };
+  /** Write one MCP server entry, preserving the rest of the config file. */
+  "cap:saveMcp": { request: SaveMcpRequest; response: SaveCapabilityResult };
 
   /** Read one persisted setting. */
   "settings:get": { request: { key: string }; response: SettingValue };
@@ -84,12 +230,23 @@ export const IPC_CHANNELS = [
   "projects:touch",
   "dialog:pickFolder",
   "scan:project",
+  "scan:watch",
+  "scan:unwatch",
+  "fs:readFile",
+  "fs:writeFile",
+  "fs:listDir",
+  "cap:saveAgent",
+  "cap:saveMcp",
   "settings:get",
   "settings:set",
 ] as const satisfies readonly IpcChannel[];
 
-/** Main → renderer push channels (subscriptions), populated in later phases. */
-export type IpcEventMap = Record<string, never>;
+/** Main → renderer push channels (subscriptions). */
+export type IpcEventMap = {
+  "scan:changed": ScanChangedEvent;
+};
+
+export type IpcEventChannel = keyof IpcEventMap;
 
 // -------------------------------------------------------------- bridge shape
 
@@ -107,6 +264,23 @@ export type AmosApi = {
   };
   scan: {
     project(input: { projectId: string }): Promise<ProjectScan>;
+    watch(input: { projectId: string }): Promise<{ ok: true }>;
+    unwatch(input: { projectId: string }): Promise<{ ok: true }>;
+    /** Subscribe to debounced filesystem changes; returns an unsubscribe. */
+    onChanged(listener: (event: ScanChangedEvent) => void): () => void;
+  };
+  fs: {
+    readFile(input: { path: string }): Promise<ReadFileResult>;
+    writeFile(input: {
+      path: string;
+      content: string;
+      expectedMtimeMs?: number | null;
+    }): Promise<WriteFileResult>;
+    listDir(input: { path: string; maxDepth?: number }): Promise<ListDirResult>;
+  };
+  cap: {
+    saveAgent(input: SaveAgentRequest): Promise<SaveCapabilityResult>;
+    saveMcp(input: SaveMcpRequest): Promise<SaveCapabilityResult>;
   };
   settings: {
     get(input: { key: string }): Promise<SettingValue>;

@@ -7,6 +7,7 @@ import {
   type SkillFile,
 } from "../../shared/capabilities.js";
 import {
+  fileMtimeMs,
   fileSize,
   isFile,
   readDirectory,
@@ -44,6 +45,7 @@ export async function collectAgents(
   for (const file of files) {
     if (!file.path.toLowerCase().endsWith(".md")) continue;
     const fallbackName = path.basename(file.path).replace(/\.md$/i, "");
+    const mtimeMs = await fileMtimeMs(file.path);
     const source = await readTextFile(file.path, chunk);
     if (source == null) {
       chunk.items.push({
@@ -53,6 +55,7 @@ export async function collectAgents(
         name: fallbackName,
         path: file.path,
         sourceFile: file.path,
+        mtimeMs,
         data: null,
         parseError: "File could not be read",
       });
@@ -70,6 +73,7 @@ export async function collectAgents(
       name,
       path: file.path,
       sourceFile: file.path,
+      mtimeMs,
       data: parsed.frontmatter ? toAgentData(frontmatter, parsed.body) : null,
       ...(parsed.error ? { parseError: parsed.error } : {}),
     });
@@ -94,6 +98,7 @@ export async function collectSkills(
     if (!(await isFile(sourceFile))) continue;
 
     const id = capabilityId("skill", sourceFile, entry.name);
+    const mtimeMs = await fileMtimeMs(sourceFile);
     const source = await readTextFile(sourceFile, chunk);
     const files = await listSkillFiles(directory, chunk);
 
@@ -105,6 +110,7 @@ export async function collectSkills(
         name: entry.name,
         path: directory,
         sourceFile,
+        mtimeMs,
         data: null,
         parseError: "SKILL.md could not be read",
       });
@@ -120,6 +126,7 @@ export async function collectSkills(
       name: entry.name,
       path: directory,
       sourceFile,
+      mtimeMs,
       data: parsed.frontmatter
         ? {
             description:
@@ -154,12 +161,13 @@ async function listSkillFiles(directory: string, chunk: ScanChunk): Promise<Skil
  * servers have no file of their own: `path` and `sourceFile` are both the
  * config file that declares them.
  */
-export function collectMcpServers(
+export async function collectMcpServers(
   sourceFile: string,
   servers: Record<string, unknown>,
   origin: Origin,
   chunk: ScanChunk,
-): void {
+): Promise<void> {
+  const mtimeMs = await fileMtimeMs(sourceFile);
   for (const name of Object.keys(servers).sort()) {
     const parsed = parseMcpEntry(servers[name]);
     chunk.items.push({
@@ -169,6 +177,7 @@ export function collectMcpServers(
       name,
       path: sourceFile,
       sourceFile,
+      mtimeMs,
       data: parsed.data,
       ...(parsed.error ? { parseError: parsed.error } : {}),
     });
@@ -180,12 +189,12 @@ export function collectMcpServers(
  * as a single broken MCP item named after the file, so the UI can point at it
  * instead of silently showing nothing.
  */
-export function pushBrokenFile(
+export async function pushBrokenFile(
   filePath: string,
   origin: Origin,
   chunk: ScanChunk,
   message: string,
-): void {
+): Promise<void> {
   const name = path.basename(filePath);
   chunk.items.push({
     kind: "mcp",
@@ -194,6 +203,7 @@ export function pushBrokenFile(
     name,
     path: filePath,
     sourceFile: filePath,
+    mtimeMs: await fileMtimeMs(filePath),
     data: null,
     parseError: message,
   });

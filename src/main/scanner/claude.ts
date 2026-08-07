@@ -72,17 +72,17 @@ async function collectClaudeMcpFile(
   try {
     json = JSON.parse(source);
   } catch (err) {
-    pushBrokenFile(filePath, origin, chunk, err instanceof Error ? err.message : String(err));
+    await pushBrokenFile(filePath, origin, chunk, err instanceof Error ? err.message : String(err));
     return;
   }
 
   const parsed = McpServersFileSchema.safeParse(json);
   if (!parsed.success) {
-    pushBrokenFile(filePath, origin, chunk, formatZodError(parsed.error));
+    await pushBrokenFile(filePath, origin, chunk, formatZodError(parsed.error));
     return;
   }
 
   const servers = parsed.data.mcpServers;
   if (!servers) return;
-  collectMcpServers(filePath, servers, origin, chunk);
+  await collectMcpServers(filePath, servers, origin, chunk);
 }

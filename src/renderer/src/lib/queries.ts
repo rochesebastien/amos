@@ -1,5 +1,6 @@
 // TanStack Query client, query keys, and typed hooks over the IPC bridge.
 import { QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { SaveAgentRequest, SaveMcpRequest } from "@shared/ipc";
 import { ipc } from "./ipc";
 
 export const queryClient = new QueryClient({
@@ -16,6 +17,8 @@ export const qk = {
   projects: ["projects"] as const,
   scan: (projectId: string) => ["scan", projectId] as const,
   setting: (key: string) => ["setting", key] as const,
+  file: (path: string) => ["file", path] as const,
+  dir: (path: string) => ["dir", path] as const,
 };
 
 // ----- Queries --------------------------------------------------------------
@@ -45,6 +48,33 @@ export function useSetting(key: string) {
   });
 }
 
+/**
+ * One file's text plus the `mtimeMs` a later save has to match. Never cached
+ * across a mount: an editor that reopens a file must see what is on disk now,
+ * or its conflict token is already stale.
+ */
+export function useFileContent(path: string | null | undefined) {
+  return useQuery({
+    queryKey: qk.file(path ?? ""),
+    queryFn: () => ipc.readFile(path!),
+    enabled: Boolean(path),
+    staleTime: 0,
+    gcTime: 0,
+    retry: false,
+  });
+}
+
+/** Recursive listing of a folder — the skill editor's file tree. */
+export function useDirListing(path: string | null | undefined, maxDepth?: number) {
+  return useQuery({
+    queryKey: qk.dir(path ?? ""),
+    queryFn: () => ipc.listDir(path!, maxDepth),
+    enabled: Boolean(path),
+    staleTime: 2_000,
+    retry: false,
+  });
+}
+
 // ----- Mutations ------------------------------------------------------------
 
 export function useProjectMutations() {
@@ -65,6 +95,48 @@ export function useProjectMutations() {
       onSuccess: invalidate,
     }),
   };
+}
+
+/**
+ * Saving a capability always ends with the same two moves: rescan the project
+ * (the filesystem, not this cache, is the truth) and drop the cached bytes of
+ * the file that was just rewritten.
+ */
+function useCapabilityInvalidation(projectId: string) {
+  const qc = useQueryClient();
+  return (filePath?: string) => {
+    void qc.invalidateQueries({ queryKey: qk.scan(projectId) });
+    void qc.invalidateQueries({ queryKey: ["dir"] });
+    if (filePath) void qc.invalidateQueries({ queryKey: qk.file(filePath) });
+  };
+}
+
+/** Write an agent `.md` or a `SKILL.md` through the safe-write pipeline. */
+export function useSaveAgent(projectId: string) {
+  const invalidate = useCapabilityInvalidation(projectId);
+  return useMutation({
+    mutationFn: (input: SaveAgentRequest) => ipc.saveAgent(input),
+    onSuccess: (result) => invalidate(result.path),
+  });
+}
+
+/** Write (or remove) one MCP server entry in its config file. */
+export function useSaveMcp(projectId: string) {
+  const invalidate = useCapabilityInvalidation(projectId);
+  return useMutation({
+    mutationFn: (input: SaveMcpRequest) => ipc.saveMcp(input),
+    onSuccess: (result) => invalidate(result.path),
+  });
+}
+
+/** Write an arbitrary file of a skill folder. */
+export function useWriteFile(projectId: string) {
+  const invalidate = useCapabilityInvalidation(projectId);
+  return useMutation({
+    mutationFn: (input: { path: string; content: string; expectedMtimeMs?: number | null }) =>
+      ipc.writeFile(input),
+    onSuccess: (result) => invalidate(result.path),
+  });
 }
 
 export function useSettingMutation() {

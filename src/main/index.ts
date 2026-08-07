@@ -2,7 +2,7 @@ import { app, BrowserWindow, shell } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { closeDatabase, initDatabase } from "./db/index.js";
-import { registerIpcHandlers } from "./ipc.js";
+import { disposeIpcHandlers, registerIpcHandlers } from "./ipc.js";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -84,5 +84,8 @@ if (!app.requestSingleInstanceLock()) {
     if (process.platform !== "darwin") app.quit();
   });
 
-  app.on("will-quit", () => closeDatabase());
+  app.on("will-quit", () => {
+    void disposeIpcHandlers();
+    closeDatabase();
+  });
 }
