@@ -115,24 +115,29 @@ are data, and the monospace is what marks them as quotable.
 
 ### The product mark
 
-An **orchestration glyph** — one hub node wired to three satellites, standing
-for the app driving a project's agents, skills and MCP servers. It exists
-twice, on purpose:
+A **five-bladed pinwheel**, and the wordmark that sets it as the "o" of the
+product name — `am⊗s`. Both live in `src/renderer/src/assets/` as
+white-on-transparent PNGs, trimmed to their artwork (388×388 and 1274×302).
 
-- **`components/Logo.tsx`** — the in-app marks, drawn as inline SVG so they
-  follow the theme. Everything takes `currentColor`; the wires (35%) and
-  satellites (55%) are held back so the hub reads as the centre. `LogoMark` is
-  the glyph alone (sidebar rail, message avatars, empty states);
-  `LogoWordmark` pairs it with the product name.
-- **`assets/logo.svg`** — the same geometry, white on a near-black rounded
-  tile, for the favicon and as the source of the packaged app icons.
-  `node scripts/gen-icons.mjs` rasterises it into `build/icon.png` (1024²) and
-  `build/icons/*.png`; the geometry *and the two colours* are duplicated in
-  that script and have to be kept in step by hand.
+**They are never drawn as images.** `components/Logo.tsx` uses each file as a
+**CSS mask** over `bg-current`: the alpha channel is the shape, the surrounding
+text colour is the ink. That is what keeps a raster asset inside a monochrome
+system — one file reads black on the light theme and white on the dark one,
+with nothing to swap and no second copy to keep in step.
 
-These are placeholders in the sense that they are geometric rather than
-designed — but they are monochrome by construction and should be replaced as a
-set, not patched.
+- `LogoMark` — the glyph alone. Square, sized with `size-*`: the collapsed
+  sidebar rail, chat message avatars, the Settings header, empty states.
+- `LogoWordmark` — the full mark. Sized by **height** (`h-5`, `h-11`); the
+  width follows from the artwork's ratio, held in the component. It is the
+  brand block of the expanded sidebar and of the welcome screen, and it carries
+  the accessible name "AMOS" (the mark alone is decorative).
+
+`node scripts/gen-icons.mjs` rasterises `logo-mark.png` into the packaged app
+icons — `build/icon.png` (1024²) and `build/icons/*.png` — as the white glyph
+on a near-black rounded tile, and emits `assets/favicon.png` (the same tile,
+because a white-on-transparent mark would vanish on a light browser tab). The
+artwork is the single source: replacing the PNG and re-running the script is
+the whole update.
 
 ### The ecosystem marks
 

@@ -50,7 +50,7 @@ export const dict: Record<Lang, Record<string, string>> = {
     "sidebar.sectionEmpty": "None",
 
     // welcome / recents
-    "welcome.title": "Welcome to AMOS",
+    "welcome.title": "Agentic Management and Orchestrator Software",
     "welcome.subtitle":
       "Open a project folder to manage its agents, skills and MCP servers — for Claude and Codex alike.",
     "welcome.openFolder": "Open folder",
@@ -357,7 +357,7 @@ export const dict: Record<Lang, Record<string, string>> = {
     "sidebar.scanning": "Analyse…",
     "sidebar.sectionEmpty": "Aucun",
 
-    "welcome.title": "Bienvenue dans AMOS",
+    "welcome.title": "Agentic Management and Orchestrator Software",
     "welcome.subtitle":
       "Ouvrez un dossier de projet pour gérer ses agents, skills et serveurs MCP — côté Claude comme côté Codex.",
     "welcome.openFolder": "Ouvrir un dossier",

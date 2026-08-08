@@ -1,112 +1,144 @@
 #!/usr/bin/env node
-// Rasterises the AMOS mark (src/renderer/src/assets/logo.svg) into the PNGs
-// electron-builder needs under build/. electron-builder derives the Windows
-// .ico and the macOS .icns from a single square PNG of at least 512x512, and
-// uses build/icons/*.png for Linux.
+// Rasterises the AMOS mark (src/renderer/src/assets/logo-mark.png) into the
+// PNGs electron-builder needs under build/, plus the renderer favicon.
+// electron-builder derives the Windows .ico and the macOS .icns from a single
+// square PNG of at least 512x512, and uses build/icons/*.png for Linux.
 //
-// Done with signed distance fields + a hand-rolled PNG writer rather than a
-// rasteriser dependency: the geometry is three lines and four discs, and
-// pulling sharp (a native module) into a tree that already juggles two
-// better-sqlite3 ABIs would cost far more than it saves. Regenerate with
-// `node scripts/gen-icons.mjs` after editing the geometry below — keep it in
-// sync with logo.svg and components/Logo.tsx by hand.
+// The mark ships as white-on-transparent artwork — the same file the UI masks
+// with `currentColor` — so this script only has to composite it, at the right
+// scale, over a rounded tile. Decoding and encoding are hand-rolled on
+// node:zlib rather than pulling a rasteriser in: a tree that already juggles
+// two better-sqlite3 ABIs does not need sharp for one build step.
+//
+// Run `node scripts/gen-icons.mjs` after replacing the artwork.
 
-import { deflateSync } from "node:zlib";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { deflateSync, inflateSync } from "node:zlib";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
+const SOURCE = path.join(root, "src/renderer/src/assets/logo-mark.png");
 
-// ---------------------------------------------------------------- geometry
-// All coordinates in the logo.svg 64x64 viewBox; scaled to the target size.
-const VIEW = 64;
-const INK = [0x0a, 0x0a, 0x0a]; // tile
-const PAPER = [0xfa, 0xfa, 0xfa]; // glyph
+// The tile: near-black `--background` of the dark theme, white glyph, corner
+// radius and inset as fractions of the icon so every size matches.
+const TILE = [0x0a, 0x0a, 0x0a];
+const GLYPH = [0xfa, 0xfa, 0xfa];
+const CORNER_FRACTION = 14 / 64;
+const GLYPH_FRACTION = 0.62; // share of the icon's width the mark occupies
 
-const HUB = { x: 32, y: 32, r: 7 };
-const SATELLITES = [
-  { x: 32, y: 12 },
-  { x: 14.68, y: 42 },
-  { x: 49.32, y: 42 },
-];
-const SATELLITE_R = 4.6;
-const WIRE_HALF_W = 1.6; // stroke-width 3.2
-const CORNER_R = 14;
+// ------------------------------------------------------------ PNG decoding
+/** Decodes an 8-bit, non-interlaced RGBA PNG into {width, height, pixels}. */
+function decodePng(buffer) {
+  let pos = 8;
+  let width = 0;
+  let height = 0;
+  const idat = [];
+  while (pos < buffer.length) {
+    const length = buffer.readUInt32BE(pos);
+    const type = buffer.toString("ascii", pos + 4, pos + 8);
+    const data = buffer.subarray(pos + 8, pos + 8 + length);
+    if (type === "IHDR") {
+      width = data.readUInt32BE(0);
+      height = data.readUInt32BE(4);
+      const [depth, colour, , , interlace] = [data[8], data[9], data[10], data[11], data[12]];
+      if (depth !== 8 || colour !== 6 || interlace !== 0) {
+        throw new Error("logo-mark.png must be an 8-bit non-interlaced RGBA PNG");
+      }
+    } else if (type === "IDAT") {
+      idat.push(data);
+    }
+    pos += 12 + length;
+  }
 
+  const raw = inflateSync(Buffer.concat(idat));
+  const stride = width * 4;
+  const pixels = Buffer.alloc(height * stride);
+  let read = 0;
+  for (let y = 0; y < height; y++) {
+    const filter = raw[read++];
+    const row = pixels.subarray(y * stride, (y + 1) * stride);
+    raw.copy(row, 0, read, read + stride);
+    read += stride;
+    const prior = y > 0 ? pixels.subarray((y - 1) * stride, y * stride) : null;
+    for (let i = 0; i < stride; i++) {
+      const a = i >= 4 ? row[i - 4] : 0;
+      const b = prior ? prior[i] : 0;
+      const c = prior && i >= 4 ? prior[i - 4] : 0;
+      let value = row[i];
+      if (filter === 1) value += a;
+      else if (filter === 2) value += b;
+      else if (filter === 3) value += (a + b) >> 1;
+      else if (filter === 4) {
+        const pa = Math.abs(b - c);
+        const pb = Math.abs(a - c);
+        const pc = Math.abs(a + b - 2 * c);
+        value += pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+      }
+      row[i] = value & 0xff;
+    }
+  }
+  return { width, height, pixels };
+}
+
+// --------------------------------------------------------------- rendering
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
-function sdCircle(px, py, cx, cy, r) {
-  return Math.hypot(px - cx, py - cy) - r;
+function sdRoundedRect(px, py, size, r) {
+  const qx = Math.abs(px - size / 2) - (size / 2 - r);
+  const qy = Math.abs(py - size / 2) - (size / 2 - r);
+  return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r;
 }
 
-/** Distance to a round-capped segment — a stroked line with linecap="round". */
-function sdSegment(px, py, ax, ay, bx, by, halfW) {
-  const dx = bx - ax;
-  const dy = by - ay;
-  const len2 = dx * dx + dy * dy;
-  const t = clamp01(len2 === 0 ? 0 : ((px - ax) * dx + (py - ay) * dy) / len2);
-  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy)) - halfW;
-}
-
-function sdRoundedRect(px, py, w, h, r) {
-  const qx = Math.abs(px - w / 2) - (w / 2 - r);
-  const qy = Math.abs(py - h / 2) - (h / 2 - r);
-  return (
-    Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r
-  );
-}
-
-/**
- * Coverage of a shape at a pixel, from its signed distance in *pixel* units.
- * A one-pixel linear ramp across the edge is all the antialiasing this needs.
- */
+/** A one-pixel linear ramp across the edge is all the antialiasing this needs. */
 const coverage = (d) => clamp01(0.5 - d);
 
-/** Straight `src` over `dst`, both premultiplied-free RGBA in 0..255 / 0..1. */
-function over(dst, rgb, alpha) {
-  if (alpha <= 0) return;
-  const a = alpha;
-  dst[0] = rgb[0] * a + dst[0] * (1 - a);
-  dst[1] = rgb[1] * a + dst[1] * (1 - a);
-  dst[2] = rgb[2] * a + dst[2] * (1 - a);
-  dst[3] = a + dst[3] * (1 - a);
+/**
+ * Average alpha of the source rectangle a destination pixel maps onto — a box
+ * filter, which is what a 388px mark scaled to 16px needs to stay readable.
+ */
+function sampleAlpha(mark, x0, y0, x1, y1) {
+  const left = Math.max(0, Math.floor(x0));
+  const top = Math.max(0, Math.floor(y0));
+  const right = Math.min(mark.width, Math.ceil(x1));
+  const bottom = Math.min(mark.height, Math.ceil(y1));
+  if (right <= left || bottom <= top) return 0;
+  let sum = 0;
+  for (let y = top; y < bottom; y++) {
+    for (let x = left; x < right; x++) {
+      sum += mark.pixels[(y * mark.width + x) * 4 + 3];
+    }
+  }
+  return sum / ((right - left) * (bottom - top) * 255);
 }
 
-/** Renders the mark at `size`x`size` into an 8-bit RGBA buffer. */
-function render(size) {
-  const scale = size / VIEW;
+/** Renders the icon at `size`x`size` into an 8-bit RGBA buffer. */
+function render(mark, size) {
   const rgba = Buffer.alloc(size * size * 4);
-  const px = [0, 0, 0, 0];
+  const radius = size * CORNER_FRACTION;
+  const glyphSize = size * GLYPH_FRACTION;
+  const offset = (size - glyphSize) / 2;
+  const scale = mark.width / glyphSize; // source pixels per destination pixel
 
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
-      // Sample at pixel centres, in viewBox units, with distances converted
-      // back to pixels so the antialiasing ramp stays one pixel wide.
-      const ux = (x + 0.5) / scale;
-      const uy = (y + 0.5) / scale;
-      px[0] = px[1] = px[2] = px[3] = 0;
-
-      over(px, INK, coverage(sdRoundedRect(ux, uy, VIEW, VIEW, CORNER_R) * scale));
-
-      let wire = Infinity;
-      for (const s of SATELLITES) {
-        wire = Math.min(wire, sdSegment(ux, uy, HUB.x, HUB.y, s.x, s.y, WIRE_HALF_W));
-      }
-      over(px, PAPER, coverage(wire * scale) * 0.35);
-
-      let sat = Infinity;
-      for (const s of SATELLITES) {
-        sat = Math.min(sat, sdCircle(ux, uy, s.x, s.y, SATELLITE_R));
-      }
-      over(px, PAPER, coverage(sat * scale) * 0.55);
-      over(px, PAPER, coverage(sdCircle(ux, uy, HUB.x, HUB.y, HUB.r) * scale));
+      const tile = coverage(sdRoundedRect(x + 0.5, y + 0.5, size, radius));
+      const glyph =
+        tile <= 0
+          ? 0
+          : sampleAlpha(
+              mark,
+              (x - offset) * scale,
+              (y - offset) * scale,
+              (x + 1 - offset) * scale,
+              (y + 1 - offset) * scale,
+            );
 
       const o = (y * size + x) * 4;
-      rgba[o] = Math.round(px[0]);
-      rgba[o + 1] = Math.round(px[1]);
-      rgba[o + 2] = Math.round(px[2]);
-      rgba[o + 3] = Math.round(px[3] * 255);
+      for (let c = 0; c < 3; c++) {
+        rgba[o + c] = Math.round(TILE[c] * (1 - glyph) + GLYPH[c] * glyph);
+      }
+      rgba[o + 3] = Math.round(tile * 255);
     }
   }
   return rgba;
@@ -159,6 +191,7 @@ function encodePng(rgba, size) {
 }
 
 // -------------------------------------------------------------------- main
+const mark = decodePng(readFileSync(SOURCE));
 const buildDir = path.join(root, "build");
 const linuxDir = path.join(buildDir, "icons");
 mkdirSync(linuxDir, { recursive: true });
@@ -167,7 +200,7 @@ mkdirSync(linuxDir, { recursive: true });
 // Linux icon set (electron-builder picks them up by <size>x<size>.png name).
 const written = [];
 for (const size of [1024, 512, 256, 128, 64, 32, 16]) {
-  const png = encodePng(render(size), size);
+  const png = encodePng(render(mark, size), size);
   if (size === 1024) {
     writeFileSync(path.join(buildDir, "icon.png"), png);
     written.push("build/icon.png");
@@ -175,6 +208,12 @@ for (const size of [1024, 512, 256, 128, 64, 32, 16]) {
   if (size <= 512) {
     writeFileSync(path.join(linuxDir, `${size}x${size}.png`), png);
     written.push(`build/icons/${size}x${size}.png`);
+  }
+  if (size === 64) {
+    // The browser-tab icon of the renderer: the tiled version, because a
+    // white-on-transparent mark would vanish on a light tab.
+    writeFileSync(path.join(root, "src/renderer/src/assets/favicon.png"), png);
+    written.push("src/renderer/src/assets/favicon.png");
   }
 }
 console.log(`wrote ${written.length} icons:\n  ${written.join("\n  ")}`);

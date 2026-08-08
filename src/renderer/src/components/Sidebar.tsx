@@ -115,7 +115,7 @@ export function Sidebar() {
         style={{ width: SIDEBAR_RAIL }}
         className="flex h-full shrink-0 flex-col items-center gap-1 border-r border-sidebar-border bg-sidebar py-4 text-sidebar-foreground"
       >
-        <LogoMark className="mb-1 size-8" />
+        <LogoMark className="mb-1 size-7" />
         <div className="my-1 h-px w-6 bg-sidebar-border" />
         <Tooltip>
           <TooltipTrigger asChild>
@@ -235,8 +235,8 @@ export function Sidebar() {
       className="relative flex h-full shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
     >
       {/* brand */}
-      <div className="px-3 pt-4 pb-3">
-        <LogoWordmark className="px-4 py-1.5" />
+      <div className="px-7 pt-5 pb-4">
+        <LogoWordmark className="h-5" />
       </div>
 
       {/* nav */}
