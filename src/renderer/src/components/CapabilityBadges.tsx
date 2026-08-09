@@ -1,4 +1,4 @@
-import { AlertTriangle, Bot, Plug, Sparkles } from "lucide-react";
+import { AlertTriangle, Bot, Folder, Globe, Plug, Sparkles } from "lucide-react";
 import type { CapabilityItem, CapabilityKind, Ecosystem, Scope } from "@shared/capabilities";
 import { Badge } from "@/components/ui/badge";
 import { EcosystemGlyph } from "@/components/BrandIcons";
@@ -50,6 +50,32 @@ export function EcosystemBadge({ ecosystem, size = "md" }: { ecosystem: Ecosyste
         </span>
       </TooltipTrigger>
       <TooltipContent>{name}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+/**
+ * The scope as an icon — a folder for "this project", a globe for "your home
+ * folder, every project". The sidebar rows use this compact form (the word is
+ * the icon's accessible name and its tooltip); the full views keep the worded
+ * `ScopeBadge` below, where there is room to read.
+ */
+export function ScopeIcon({ scope, className }: { scope: Scope; className?: string }) {
+  const t = useT();
+  const Icon = scope === "global" ? Globe : Folder;
+  const name = t(`cap.scope.${scope}`);
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          role="img"
+          aria-label={name}
+          className={cn("inline-flex shrink-0 items-center text-muted-foreground/70", className)}
+        >
+          <Icon className="size-3" />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{scope === "global" ? t("cap.scope.globalHint") : name}</TooltipContent>
     </Tooltip>
   );
 }

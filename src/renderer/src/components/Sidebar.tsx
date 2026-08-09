@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Home,
+  Search,
   Settings as SettingsIcon,
   Moon,
   Sun,
@@ -24,7 +25,8 @@ import { ipc, type Project } from "@/lib/ipc";
 import { useSidebar, type ProjectSort, SIDEBAR_RAIL } from "@/lib/sidebar";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useConfirm } from "@/components/ui/confirm";
-import { CapabilityBadges, KIND_ICONS } from "@/components/CapabilityBadges";
+import { BrokenBadge, EcosystemBadge, KIND_ICONS, ScopeIcon } from "@/components/CapabilityBadges";
+import { SearchPalette } from "@/components/SearchPalette";
 import { cn } from "@/lib/utils";
 import { LogoMark, LogoWordmark } from "@/components/Logo";
 
@@ -44,6 +46,19 @@ export function Sidebar() {
   const { data: projects = [] } = useProjects();
   const { add, remove, touch } = useProjectMutations();
   const [sortOpen, setSortOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  // ⌘K / Ctrl+K opens the search palette from anywhere in the app frame.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setSearchOpen((o) => !o);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const activeProjectId = pathname.startsWith("/p/") ? (pathname.split("/")[2] ?? null) : null;
   const onHome = pathname === "/";
@@ -138,6 +153,19 @@ export function Sidebar() {
           <TooltipTrigger asChild>
             <button
               type="button"
+              onClick={() => setSearchOpen(true)}
+              aria-label={t("nav.search")}
+              className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
+            >
+              <Search className="size-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right">{t("nav.search")}</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
               onClick={openFolder}
               aria-label={t("sidebar.openFolder")}
               className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
@@ -223,6 +251,7 @@ export function Sidebar() {
           </TooltipTrigger>
           <TooltipContent side="right">{t("nav.expandSidebar")}</TooltipContent>
         </Tooltip>
+        <SearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
       </aside>
     );
   }
@@ -253,6 +282,17 @@ export function Sidebar() {
           <Home className={cn("size-4", onHome && "text-primary")} />
           {t("nav.home")}
         </Link>
+        <button
+          type="button"
+          onClick={() => setSearchOpen(true)}
+          className="flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
+        >
+          <Search className="size-4" />
+          {t("nav.search")}
+          <kbd className="ml-auto rounded border border-border bg-muted px-1 py-px font-sans text-[10px] text-muted-foreground/70">
+            {navigator.platform.includes("Mac") ? "\u2318K" : "Ctrl K"}
+          </kbd>
+        </button>
       </nav>
 
       {/* projects */}
@@ -403,6 +443,7 @@ export function Sidebar() {
         title={t("nav.resizeHint")}
         className="absolute right-0 top-0 z-10 h-full w-1 cursor-col-resize transition-colors hover:bg-primary/40"
       />
+      <SearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
     </aside>
   );
 }
@@ -443,7 +484,7 @@ function ProjectRow({
           next to it rather than nested inside another clickable element. */}
       <div
         className={cn(
-          "group flex items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors",
+          "group flex items-center gap-2 rounded-lg px-3 py-1.5 text-left text-sm transition-colors",
           active
             ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
             : "text-muted-foreground hover:bg-sidebar-accent/60",
@@ -455,12 +496,12 @@ function ProjectRow({
           title={project.path}
           aria-label={t("sidebar.openProject", { name: project.name })}
           aria-current={active ? "page" : undefined}
-          className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {active ? (
-            <FolderOpen className="size-3.5 shrink-0 text-muted-foreground" />
+            <FolderOpen className="size-4 shrink-0 text-muted-foreground" />
           ) : (
-            <Folder className="size-3.5 shrink-0" />
+            <Folder className="size-4 shrink-0" />
           )}
           <span className="min-w-0 flex-1 truncate">{project.name}</span>
         </button>
@@ -498,7 +539,7 @@ function ProjectRow({
       </div>
 
       {open && (
-        <div className="my-0.5 ml-3.5 border-l border-sidebar-border pl-1.5">
+        <div className="my-0.5 ml-5 border-l border-sidebar-border pl-1.5">
           <Link
             to="/p/$projectId/chat"
             params={{ projectId: project.id }}
@@ -583,13 +624,15 @@ function CapabilitySection({
             to="/p/$projectId/item/$itemId"
             params={{ projectId, itemId: item.id }}
             title={item.sourceFile}
-            className="flex items-center gap-1.5 rounded-md py-1 pl-4 pr-2 text-[12px] text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
+            className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px] text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
             activeProps={{
               className: "bg-sidebar-accent font-semibold text-sidebar-accent-foreground",
             }}
           >
+            <ScopeIcon scope={item.scope} />
             <span className="min-w-0 flex-1 truncate">{item.name}</span>
-            <CapabilityBadges item={item} size="sm" />
+            {item.parseError != null && <BrokenBadge size="sm" />}
+            <EcosystemBadge ecosystem={item.ecosystem} size="sm" />
           </Link>
         ))
       )}

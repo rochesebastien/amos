@@ -28,6 +28,7 @@ export const dict: Record<Lang, Record<string, string>> = {
 
     // nav
     "nav.home": "Home",
+    "nav.search": "Search",
     "nav.main": "Main navigation",
     "nav.settings": "Settings",
     "nav.toggleTheme": "Toggle theme",
@@ -36,6 +37,15 @@ export const dict: Record<Lang, Record<string, string>> = {
     "nav.resizeHint": "Drag to resize · double-click to collapse",
 
     // sidebar
+    "search.title": "Search",
+    "search.placeholder": "Search projects, agents, skills, MCP servers, conversations…",
+    "search.start": "Type to search across your projects.",
+    "search.empty": "No results for “{query}”",
+    "search.chats": "Conversations",
+    "search.hintNavigate": "navigate",
+    "search.hintOpen": "open",
+    "search.hintClose": "close",
+
     "sidebar.label": "Sidebar",
     "sidebar.projects": "Projects",
     "sidebar.none": "No project yet",
@@ -337,12 +347,22 @@ export const dict: Record<Lang, Record<string, string>> = {
     "common.areYouSure": "Êtes-vous sûr ?",
 
     "nav.home": "Accueil",
+    "nav.search": "Recherche",
     "nav.main": "Navigation principale",
     "nav.settings": "Paramètres",
     "nav.toggleTheme": "Changer de thème",
     "nav.expandSidebar": "Déplier le panneau",
     "nav.collapseSidebar": "Replier le panneau",
     "nav.resizeHint": "Glisser pour redimensionner · double-clic pour replier",
+
+    "search.title": "Recherche",
+    "search.placeholder": "Rechercher projets, agents, skills, serveurs MCP, conversations…",
+    "search.start": "Tapez pour chercher dans vos projets.",
+    "search.empty": "Aucun résultat pour « {query} »",
+    "search.chats": "Conversations",
+    "search.hintNavigate": "naviguer",
+    "search.hintOpen": "ouvrir",
+    "search.hintClose": "fermer",
 
     "sidebar.label": "Panneau latéral",
     "sidebar.projects": "Projets",

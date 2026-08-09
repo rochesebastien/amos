@@ -144,11 +144,14 @@
     font-family: var(--font-sans);
     font-weight: 400;
     font-size: 14px;
-    letter-spacing: -0.006em;
+    /* Mona Sans Wide: the widest cut of the variable width axis. Wide letters
+       already fill their space, so tracking stays neutral instead of tight. */
+    font-stretch: 125%;
+    letter-spacing: 0;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  /* Titles: semibold, barely tightened. One typeface, two weights — the size
+  /* Titles: semibold, same wide cut. One typeface, two weights — the size
      ladder does the hierarchy, not a display cut. */
   .font-display,
   h1,
@@ -156,7 +159,7 @@
   h3 {
     font-family: var(--font-display);
     font-weight: 600;
-    letter-spacing: -0.018em;
+    letter-spacing: -0.01em;
   }
 }
 

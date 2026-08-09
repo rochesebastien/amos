@@ -97,11 +97,13 @@ main area is `min-h-0 flex-1 overflow-y-auto`.
 ## Typography
 
 One variable typeface: **Mona Sans** (open source, loaded via `@font-face` from
-`src/renderer/src/assets/fonts`), a neutral grotesque in the Inter/Geist
-register. Two weights, no display cut:
+`src/renderer/src/assets/fonts`), set in its **Wide** cut — `font-stretch:
+125%`, the top of the font's width axis, inherited from `body` by everything.
+Wide letterforms already fill their space, so tracking stays neutral instead
+of tight. Two weights, no display cut:
 
-- **Body / UI** — 400, base **14px**, `letter-spacing: -0.006em`.
-- **Titles** — `.font-display`, `h1`–`h3`: **600**, `letter-spacing: -0.018em`.
+- **Body / UI** — 400, base **14px**, `letter-spacing: 0`.
+- **Titles** — `.font-display`, `h1`–`h3`: **600**, `letter-spacing: -0.01em`.
   View titles are `font-display text-2xl`; section headings `text-base`.
 
 Hierarchy comes from the size ladder and from space, not from weight jumps.
@@ -172,12 +174,41 @@ Root: `flex h-screen w-screen overflow-hidden bg-background text-foreground`.
 └────────────┴─────────────────────────────────────┘
 ```
 
-- **Sidebar** (`bg-sidebar`): wordmark → nav (Home) → the project list, each
-  project a clickable name plus a chevron unfolding its Agents / Skills / MCP
-  servers with ecosystem mark + scope badge → foot (Settings, theme). Collapses
-  to a 56px rail that keeps the glyph and icon-only nav.
+- **Sidebar** (`bg-sidebar`): wordmark → nav (Home, Search) → the project
+  list → foot (Settings, theme). Collapses to a 56px rail that keeps the glyph
+  and icon-only nav.
+
+  The hierarchy inside the project list is Codex-style — one visual grammar,
+  three levels:
+
+  - **Project rows** are set exactly like the nav buttons above them
+    (`px-3 py-1.5 text-sm`, `size-4` icon): a project is a place you go, the
+    same class of thing as Home. The chevron unfolds it.
+  - **Capability rows** underneath read as `[scope icon] name … [ecosystem
+    mark]`. The scope is an icon on the left — a folder for "this project", a
+    globe for "your home folder" (`ScopeIcon`, tooltip + accessible name carry
+    the word); the CLI that reads the item stays as its mark on the right. No
+    text badges at this level: two icons and a name keep thirty rows scannable.
+  - A **broken** item keeps its red `Invalid` badge — failure is the one thing
+    that may not degrade to an icon.
 - **Main** (`flex min-w-0 flex-1 flex-col`): one view; header is
   `h1.font-display.text-2xl` + optional `text-muted-foreground/70` subtitle.
+
+## Search
+
+`components/SearchPalette.tsx` — a command palette — opened from the
+sidebar's Search entry or **⌘K / Ctrl+K** anywhere in the app frame. One input
+over everything AMOS knows: projects, agents, skills, MCP servers, instruction
+files and past conversations, grouped in that order, each group capped so a
+noisy kind cannot push the others off screen. Raycast grammar: input on top,
+grouped list, `↑↓ ↵ esc` footer; rows are `[kind icon] name … project +
+ecosystem mark`.
+
+The index is not a service. On open the palette pulls each project's scan and
+sessions through the same TanStack Query keys the sidebar uses — cached data is
+free, missing data is fetched once and shared. Matching is a case-insensitive
+substring over names, descriptions and paths; with an empty query the palette
+lists the projects, as a launcher.
 
 ## Components
 
