@@ -1,4 +1,4 @@
-import { AlertTriangle, Bot, Folder, Globe, Plug, Sparkles } from "lucide-react";
+import { AlertTriangle, AtSign, Bot, Folder, Plug, Sparkles } from "lucide-react";
 import type { CapabilityItem, CapabilityKind, Ecosystem, Scope } from "@shared/capabilities";
 import { Badge } from "@/components/ui/badge";
 import { EcosystemGlyph } from "@/components/BrandIcons";
@@ -55,14 +55,14 @@ export function EcosystemBadge({ ecosystem, size = "md" }: { ecosystem: Ecosyste
 }
 
 /**
- * The scope as an icon — a folder for "this project", a globe for "your home
+ * The scope as an icon — a folder for "this project", an @ for "your home
  * folder, every project". The sidebar rows use this compact form (the word is
  * the icon's accessible name and its tooltip); the full views keep the worded
  * `ScopeBadge` below, where there is room to read.
  */
 export function ScopeIcon({ scope, className }: { scope: Scope; className?: string }) {
   const t = useT();
-  const Icon = scope === "global" ? Globe : Folder;
+  const Icon = scope === "global" ? AtSign : Folder;
   const name = t(`cap.scope.${scope}`);
   return (
     <Tooltip>
@@ -96,18 +96,19 @@ export function ScopeBadge({ scope, size = "md" }: { scope: Scope; size?: Size }
   );
 }
 
+/** Broken state: red icon + red word, nothing else — the colour is the badge. */
 export function BrokenBadge({ size = "md" }: { size?: Size }) {
   const t = useT();
   return (
-    <Badge
+    <span
       className={cn(
-        "shrink-0 border border-destructive/30 bg-destructive/15 text-destructive",
-        SIZES[size],
+        "inline-flex shrink-0 items-center gap-1 text-destructive",
+        size === "sm" ? "text-[10px]" : "text-[11px]",
       )}
     >
       <AlertTriangle className="size-3" />
       {t("cap.broken")}
-    </Badge>
+    </span>
   );
 }
 

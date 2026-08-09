@@ -275,7 +275,7 @@ export function Sidebar() {
           className={cn(
             "flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors",
             onHome
-              ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
+              ? "bg-sidebar-accent text-sidebar-accent-foreground"
               : "text-muted-foreground hover:bg-sidebar-accent/60",
           )}
         >
@@ -398,7 +398,7 @@ export function Sidebar() {
           className={cn(
             "flex flex-1 items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
             onSettings
-              ? "bg-sidebar-accent font-semibold"
+              ? "bg-sidebar-accent"
               : "text-muted-foreground hover:bg-sidebar-accent/60",
           )}
         >
@@ -486,7 +486,7 @@ function ProjectRow({
         className={cn(
           "group flex items-center gap-2 rounded-lg px-3 py-1.5 text-left text-sm transition-colors",
           active
-            ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
+            ? "bg-sidebar-accent text-sidebar-accent-foreground"
             : "text-muted-foreground hover:bg-sidebar-accent/60",
         )}
       >
@@ -545,7 +545,7 @@ function ProjectRow({
             params={{ projectId: project.id }}
             className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px] text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
             activeProps={{
-              className: "bg-sidebar-accent font-semibold text-sidebar-accent-foreground",
+              className: "bg-sidebar-accent text-sidebar-accent-foreground",
             }}
           >
             <MessageSquare className="size-3" />
@@ -595,10 +595,10 @@ function CapabilitySection({
   const Icon = KIND_ICONS[kind];
   return (
     <div className="group/section py-0.5">
-      <div className="flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
-        <Icon className="size-3" />
+      <div className="flex items-center gap-2 px-2 py-1 text-[13px] text-muted-foreground">
+        <Icon className="size-3.5" />
         <span className="truncate">{label}</span>
-        <span className="text-muted-foreground/40">{items.length}</span>
+        <span className="text-[11px] text-muted-foreground/50">{items.length}</span>
         <Tooltip>
           <TooltipTrigger asChild>
             <Link
@@ -607,7 +607,7 @@ function CapabilitySection({
               aria-label={t(`new.title.${kind}`)}
               className="ml-auto rounded p-0.5 opacity-0 transition-opacity hover:bg-sidebar-accent hover:text-foreground focus-visible:opacity-100 group-hover/section:opacity-100"
             >
-              <Plus className="size-3" />
+              <Plus className="size-3.5" />
             </Link>
           </TooltipTrigger>
           <TooltipContent side="right">{t(`new.title.${kind}`)}</TooltipContent>
@@ -626,7 +626,7 @@ function CapabilitySection({
             title={item.sourceFile}
             className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px] text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
             activeProps={{
-              className: "bg-sidebar-accent font-semibold text-sidebar-accent-foreground",
+              className: "bg-sidebar-accent text-sidebar-accent-foreground",
             }}
           >
             <ScopeIcon scope={item.scope} />
