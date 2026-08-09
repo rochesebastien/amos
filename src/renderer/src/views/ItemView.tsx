@@ -1,5 +1,6 @@
 import { Link, useParams } from "@tanstack/react-router";
-import { AlertTriangle, ArrowLeft, FileCode } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
+import { ViewHeader } from "@/components/ViewHeader";
 import type { CapabilityItem } from "@shared/capabilities";
 import { useProjectScan } from "@/lib/queries";
 import { useT, type TFunc } from "@/lib/i18n";
@@ -50,29 +51,24 @@ export function ItemView() {
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
-      <header className="px-8 pt-8 pb-4">
-        <Link
-          to="/p/$projectId"
-          params={{ projectId }}
-          className="mb-3 inline-flex items-center gap-1.5 text-[13px] text-muted-foreground/70 transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="size-3.5" />
-          {t("cap.backToProject")}
-        </Link>
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="flex min-w-0 items-center gap-3 text-2xl font-display">
-            <Icon className="size-5 shrink-0 text-muted-foreground" />
-            <span className="truncate">{item.name}</span>
-          </h1>
-          <CapabilityBadges item={item} />
-        </div>
-        <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground/70">
-          <FileCode className="size-3.5 shrink-0" />
-          <span className="truncate font-mono text-[13px]" title={item.sourceFile}>
-            {item.sourceFile}
-          </span>
-        </p>
-      </header>
+      <ViewHeader
+        backTo="/p/$projectId"
+        backParams={{ projectId }}
+        backLabel={t("cap.backToProject")}
+        icon={<Icon className="size-4" />}
+        title={item.name}
+        meta={
+          <>
+            <CapabilityBadges item={item} size="sm" />
+            <span
+              className="hidden truncate font-mono text-[12px] text-muted-foreground/60 lg:block"
+              title={item.sourceFile}
+            >
+              {item.sourceFile}
+            </span>
+          </>
+        }
+      />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-4">
         {item.parseError && (

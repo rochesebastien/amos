@@ -167,12 +167,31 @@ Root: `flex h-screen w-screen overflow-hidden bg-background text-foreground`.
 
 ```
 ┌────────────┬─────────────────────────────────────┐
-│ Sidebar    │  Main view                          │
-│  ~280px    │   ┌─ header (font-display title) ─┐  │
-│            │   │ view content / scroll area    │  │
-│            │   └───────────────────────────────┘  │
+│ Sidebar    │ ← icon  Title  ·meta        actions │  ← ViewHeader (h≈48px)
+│  ~280px    │ ┌─────────────────────────────────┐ │
+│            │ │ view content / scroll area      │ │
+│            │ └─────────────────────────────────┘ │
 └────────────┴─────────────────────────────────────┘
 ```
+
+### The view header
+
+Every main view wears the same compact bar — **`components/ViewHeader.tsx`**,
+the chat header generalised. One `border-b` line, `text-base font-display`
+title, and a fixed grammar left to right:
+
+1. **Back arrow** — only when the view has a parent (an editor goes back to
+   its project overview). Icon-only, left of the name; the label lives in the
+   tooltip and the accessible name.
+2. **View icon** (`size-4`, muted) — the kind: folder, agent, skill, file…
+3. **Name** — project name on the overview, item name in an editor, session
+   title in the chat, section name in Settings.
+4. **Quiet meta** — small badges, a mono path (hidden below `md`/`lg`).
+5. **Actions** — right-aligned, compact (`size="sm"` / icon buttons).
+
+Anything that needs a sentence — descriptions, timestamps, hints — belongs to
+the top of the view's content, not to the bar. The header names the place;
+the content explains it.
 
 - **Sidebar** (`bg-sidebar`): wordmark → nav (Home, Search) → the project
   list → foot (Settings, theme). Collapses to a 56px rail that keeps the glyph

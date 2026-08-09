@@ -24,6 +24,7 @@ import { useProjects, useProjectScan, useWriteFile } from "@/lib/queries";
 import { relativeTime, useT, type TFunc } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { errorText } from "@/components/editors/shell";
+import { ViewHeader } from "@/components/ViewHeader";
 import { EcosystemBadge, KIND_ICONS, ScopeBadge } from "@/components/CapabilityBadges";
 import { cn, formatBytes } from "@/lib/utils";
 
@@ -72,41 +73,47 @@ export function ProjectView() {
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
-      <header className="flex items-start gap-4 px-8 pt-8 pb-4">
-        <div className="min-w-0 flex-1">
-          <h1 className="flex items-center gap-3 text-2xl font-display">
-            <FolderOpen className="size-5 shrink-0 text-muted-foreground" />
-            <span className="truncate">{project.name}</span>
-          </h1>
-          <p className="mt-1 truncate text-sm text-muted-foreground/70" title={project.path}>
-            {t("project.folder")}: {project.path}
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground/60">
-            {project.lastOpenedAt
-              ? t("projects.lastOpened", { when: relativeTime(t, project.lastOpenedAt) })
-              : t("projects.never")}
-            {scan && ` · ${t("project.scannedAt", { when: relativeTime(t, scan.scannedAt) })}`}
-          </p>
-        </div>
-        <Link
-          to="/p/$projectId/chat"
-          params={{ projectId }}
-          className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
-        >
-          <MessageSquare className="size-4" />
-          {t("chat.title")}
-        </Link>
-        <Button
-          variant="outline"
-          onClick={() => void scanQuery.refetch()}
-          disabled={scanQuery.isFetching}
-        >
-          <RefreshCw className={cn("size-4", scanQuery.isFetching && "animate-spin")} />
-          {scanQuery.isFetching ? t("project.scanning") : t("project.rescan")}
-        </Button>
-      </header>
+      <ViewHeader
+        icon={<FolderOpen className="size-4" />}
+        title={project.name}
+        meta={
+          <span
+            className="hidden truncate font-mono text-[12px] text-muted-foreground/60 md:block"
+            title={project.path}
+          >
+            {project.path}
+          </span>
+        }
+        actions={
+          <>
+            <Link
+              to="/p/$projectId/chat"
+              params={{ projectId }}
+              className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90"
+            >
+              <MessageSquare className="size-3.5" />
+              {t("chat.title")}
+            </Link>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void scanQuery.refetch()}
+              disabled={scanQuery.isFetching}
+            >
+              <RefreshCw className={cn("size-3.5", scanQuery.isFetching && "animate-spin")} />
+              {scanQuery.isFetching ? t("project.scanning") : t("project.rescan")}
+            </Button>
+          </>
+        }
+      />
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-10">
+      <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
+        <p className="mb-4 text-xs text-muted-foreground/60">
+          {project.lastOpenedAt
+            ? t("projects.lastOpened", { when: relativeTime(t, project.lastOpenedAt) })
+            : t("projects.never")}
+          {scan && ` · ${t("project.scannedAt", { when: relativeTime(t, scan.scannedAt) })}`}
+        </p>
         {scanQuery.isError && (
           <p className="mb-4 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
             {t("project.scanFailed", { error: (scanQuery.error as Error).message })}
