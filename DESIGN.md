@@ -59,19 +59,25 @@ to near-black.
 #### Dark (`.dark`)
 
 ```
---background          #0a0a0a
+--background          #171717   near-black page
 --foreground          #fafafa
---card / --popover    #131313 / #171717
+--card / --popover    #1e1e1e / #232323   a step up from the page
 --primary             #fafafa   ink inverts with the theme
---primary-foreground  #0a0a0a
---secondary/--muted   #1f1f1f / #1c1c1c
+--primary-foreground  #171717
+--secondary/--muted   #262626 / #222222
 --muted-foreground    #a1a1a1
---accent              #232323
---border / --input    #262626 / #2e2e2e
---ring                #525252
---sidebar             #0d0d0d
+--accent              #2a2a2a
+--border / --input    #2e2e2e / #333333
+--ring                #555555
+--sidebar             #282828   a lighter panel beside the page
 --destructive         #f87171   lightened so it reads on black
 ```
+
+The dark sidebar is deliberately **lighter** than the page (`#282828` on
+`#171717`), the editor-panel convention (Codex, VS Code): the rail reads as a
+surface laid over the canvas, not a hole in it. The light theme does the
+opposite — a hair off white — because there the page is already the bright
+plane.
 
 **The one exception.** `--destructive` is the only chromatic token left, and it
 is reserved for genuine failure: the *broken file* list, delete actions, save
@@ -203,15 +209,49 @@ the content explains it.
   - **Project rows** are set exactly like the nav buttons above them
     (`px-3 py-1.5 text-sm`, `size-4` icon): a project is a place you go, the
     same class of thing as Home. The chevron unfolds it.
-  - **Capability rows** underneath read as `[scope icon] name … [ecosystem
-    mark]`. The scope is an icon on the left — a folder for "this project", a
-    globe for "your home folder" (`ScopeIcon`, tooltip + accessible name carry
-    the word); the CLI that reads the item stays as its mark on the right. No
-    text badges at this level: two icons and a name keep thirty rows scannable.
-  - A **broken** item keeps its red `Invalid` badge — failure is the one thing
-    that may not degrade to an icon.
-- **Main** (`flex min-w-0 flex-1 flex-col`): one view; header is
-  `h1.font-display.text-2xl` + optional `text-muted-foreground/70` subtitle.
+  - **Section rows** (Agents / MCP servers / Skills, and Conversations) hang
+    under the project inside a left border, indented so the whole group reads
+    as the project's children. They sit one notch under the project's register
+    (13px, sentence case, a muted count); Skills wears a **sword**, the CLI
+    kinds their own icons, Conversations a message glyph over the project's
+    saved chats.
+  - **Capability rows** under each section read as `[scope icon] name …
+    [ecosystem mark]`. The scope is an icon on the left — a folder for "this
+    project", an **`@`** for "your home folder" (`ScopeIcon`, tooltip +
+    accessible name carry the word); the CLI that reads the item stays as its
+    mark on the right. No text badges at this level: two icons and a name keep
+    thirty rows scannable.
+  - A **broken** item drops every badge and turns **red** — its scope icon and
+    its name both. Failure is the one state that reaches for colour instead of
+    an extra label.
+- **Main** (`flex min-w-0 flex-1 flex-col`): one view; header is a `ViewHeader`
+  bar over the content.
+
+## Terminals
+
+`components/TerminalPanel.tsx` — a right-docked column of tabbed terminals,
+opened from a project header's terminal button (Claude / Codex / Shell) and
+mounted once in the root shell so its children keep running as the user moves
+between views. Each tab owns one xterm.js emulator and one backend terminal;
+all tabs stay mounted (hidden when inactive) so scrollback and the child
+process survive a tab switch. Its state lives in `lib/terminals.ts`.
+
+The backend (`main/terminal/manager.ts`) prefers a real PTY (`node-pty`), which
+gives the CLIs a TTY. `node-pty` is native, so it is required lazily inside a
+try/catch: when it did not compile for this Electron build the manager falls
+back to a piped `child_process` — still a live process the panel talks to, but
+without a TTY, so full-screen TUIs run in their non-interactive mode and the
+tab shows a one-line notice. `scripts/native-deps.mjs` treats a node-pty
+rebuild failure as a warning, never a fatal build error.
+
+## The project overview
+
+`ProjectView` renders what the scan found as **stacked tables**, one per
+category (Agents, MCP servers, Skills), then instruction files, then any
+unreadable paths. A table is a titled header row (`icon · name · count · add`)
+over `[scope icon] name`, a description, and the ecosystem mark — the same
+row grammar as the sidebar, given room to breathe. Broken rows are red, in
+place, rather than exiled to a separate section.
 
 ## Search
 

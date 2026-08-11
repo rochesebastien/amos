@@ -75,6 +75,14 @@ const amos: AmosApi = {
     get: (input) => invoke("settings:get", input),
     set: (input) => invoke("settings:set", input),
   },
+  terminal: {
+    create: (input) => invoke("terminal:create", input),
+    write: (input) => invoke("terminal:write", input),
+    resize: (input) => invoke("terminal:resize", input),
+    kill: (input) => invoke("terminal:kill", input),
+    onData: (listener) => subscribe("terminal:data", listener),
+    onExit: (listener) => subscribe("terminal:exit", listener),
+  },
 };
 
 contextBridge.exposeInMainWorld("amos", amos);

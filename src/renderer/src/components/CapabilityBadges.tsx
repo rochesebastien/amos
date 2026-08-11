@@ -1,4 +1,4 @@
-import { AlertTriangle, AtSign, Bot, Folder, Plug, Sparkles } from "lucide-react";
+import { AlertTriangle, AtSign, Bot, Folder, Plug, Sword } from "lucide-react";
 import type { CapabilityItem, CapabilityKind, Ecosystem, Scope } from "@shared/capabilities";
 import { Badge } from "@/components/ui/badge";
 import { EcosystemGlyph } from "@/components/BrandIcons";
@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 /** The lucide icon standing for a kind, used next to names and section titles. */
 export const KIND_ICONS: Record<CapabilityKind, typeof Bot> = {
   agent: Bot,
-  skill: Sparkles,
+  skill: Sword,
   mcp: Plug,
 };
 

@@ -59,35 +59,35 @@
 }
 
 .dark {
-  --background: #0a0a0a;
+  --background: #171717;
   --foreground: #fafafa;
-  --card: #131313;
+  --card: #1e1e1e;
   --card-foreground: #fafafa;
-  --popover: #171717;
+  --popover: #232323;
   --popover-foreground: #fafafa;
 
   --primary: #fafafa;
-  --primary-foreground: #0a0a0a;
+  --primary-foreground: #171717;
 
-  --secondary: #1f1f1f;
+  --secondary: #262626;
   --secondary-foreground: #fafafa;
-  --muted: #1c1c1c;
+  --muted: #222222;
   --muted-foreground: #a1a1a1;
-  --accent: #232323;
+  --accent: #2a2a2a;
   --accent-foreground: #fafafa;
 
   --destructive: #f87171;
-  --destructive-foreground: #0a0a0a;
+  --destructive-foreground: #171717;
 
-  --border: #262626;
-  --input: #2e2e2e;
-  --ring: #525252;
+  --border: #2e2e2e;
+  --input: #333333;
+  --ring: #555555;
 
-  --sidebar: #0d0d0d;
+  --sidebar: #282828;
   --sidebar-foreground: #fafafa;
-  --sidebar-accent: #1c1c1c;
+  --sidebar-accent: #383838;
   --sidebar-accent-foreground: #fafafa;
-  --sidebar-border: #1f1f1f;
+  --sidebar-border: #333333;
 }
 
 /* ----------------------------------------------- Map tokens into Tailwind */

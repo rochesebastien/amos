@@ -15,6 +15,12 @@ import type {
   ChatSessionDetail,
   CliDetection,
 } from "./chat.js";
+import type {
+  TerminalCreateRequest,
+  TerminalCreateResult,
+  TerminalDataEvent,
+  TerminalExitEvent,
+} from "./terminal.js";
 
 // ---------------------------------------------------------------- data model
 
@@ -250,6 +256,15 @@ export type IpcInvokeMap = {
   "settings:get": { request: { key: string }; response: SettingValue };
   /** Write one persisted setting. */
   "settings:set": { request: { key: string; value: string }; response: SettingValue };
+
+  /** Spawn a terminal in a project's folder; output arrives on `terminal:data`. */
+  "terminal:create": { request: TerminalCreateRequest; response: TerminalCreateResult };
+  /** Feed keystrokes to a terminal's child process. */
+  "terminal:write": { request: { id: string; data: string }; response: { ok: true } };
+  /** Tell a terminal its emulator was resized. */
+  "terminal:resize": { request: { id: string; cols: number; rows: number }; response: { ok: true } };
+  /** Kill a terminal's child process and forget it. Idempotent. */
+  "terminal:kill": { request: { id: string }; response: { ok: true } };
 };
 
 export type IpcChannel = keyof IpcInvokeMap;
@@ -281,6 +296,10 @@ export const IPC_CHANNELS = [
   "chat:deleteSession",
   "settings:get",
   "settings:set",
+  "terminal:create",
+  "terminal:write",
+  "terminal:resize",
+  "terminal:kill",
 ] as const satisfies readonly IpcChannel[];
 
 /** Main → renderer push channels (subscriptions). */
@@ -290,6 +309,10 @@ export type IpcEventMap = {
   "chat:event": ChatEventMessage;
   /** CLI detection changed — a binary appeared, or an auth error landed. */
   "cli:changed": CliDetection;
+  /** One chunk of a terminal's output. */
+  "terminal:data": TerminalDataEvent;
+  /** A terminal's child process exited. */
+  "terminal:exit": TerminalExitEvent;
 };
 
 export type IpcEventChannel = keyof IpcEventMap;
@@ -350,5 +373,15 @@ export type AmosApi = {
   settings: {
     get(input: { key: string }): Promise<SettingValue>;
     set(input: { key: string; value: string }): Promise<SettingValue>;
+  };
+  terminal: {
+    create(input: TerminalCreateRequest): Promise<TerminalCreateResult>;
+    write(input: { id: string; data: string }): Promise<{ ok: true }>;
+    resize(input: { id: string; cols: number; rows: number }): Promise<{ ok: true }>;
+    kill(input: { id: string }): Promise<{ ok: true }>;
+    /** Subscribe to a terminal's output; returns an unsubscribe. */
+    onData(listener: (event: TerminalDataEvent) => void): () => void;
+    /** Subscribe to terminal exits; returns an unsubscribe. */
+    onExit(listener: (event: TerminalExitEvent) => void): () => void;
   };
 };

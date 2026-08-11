@@ -1,31 +1,32 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
+import { AlertTriangle, FileText, FolderOpen, Plus, RefreshCw, SquareTerminal } from "lucide-react";
 import {
-  AlertTriangle,
-  FileText,
-  FolderOpen,
-  MessageSquare,
-  Pencil,
-  Plus,
-  RefreshCw,
-} from "lucide-react";
-import {
-  countItems,
-  ECOSYSTEMS,
   findRootInstruction,
   hasRootInstruction,
+  itemsOfKind,
   joinPath,
   ROOT_INSTRUCTION_FILES,
   type CapabilityKind,
   type Ecosystem,
   type ProjectScan,
 } from "@shared/capabilities";
+import type { TerminalKind } from "@shared/terminal";
 import { useProjects, useProjectScan, useWriteFile } from "@/lib/queries";
 import { relativeTime, useT, type TFunc } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { errorText } from "@/components/editors/shell";
 import { ViewHeader } from "@/components/ViewHeader";
-import { EcosystemBadge, KIND_ICONS, ScopeBadge } from "@/components/CapabilityBadges";
+import { EcosystemBadge, KIND_ICONS, ScopeIcon } from "@/components/CapabilityBadges";
+import { EcosystemGlyph } from "@/components/BrandIcons";
+import { useTerminals } from "@/lib/terminals";
 import { cn, formatBytes } from "@/lib/utils";
 
 /**
@@ -46,6 +47,7 @@ export function ProjectView() {
   const { projectId } = useParams({ from: "/p/$projectId" });
   const { data: projects, isLoading } = useProjects();
   const scanQuery = useProjectScan(projectId);
+  const openTab = useTerminals((s) => s.openTab);
 
   if (isLoading) {
     return (
@@ -69,7 +71,8 @@ export function ProjectView() {
   }
 
   const scan = scanQuery.data;
-  const broken = scan?.items.filter((i) => i.parseError) ?? [];
+  const openTerminal = (kind: TerminalKind) =>
+    openTab({ projectId: project.id, projectName: project.name, kind });
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
@@ -86,136 +89,276 @@ export function ProjectView() {
         }
         actions={
           <>
-            <Link
-              to="/p/$projectId/chat"
-              params={{ projectId }}
-              className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90"
-            >
-              <MessageSquare className="size-3.5" />
-              {t("chat.title")}
-            </Link>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => void scanQuery.refetch()}
-              disabled={scanQuery.isFetching}
-            >
-              <RefreshCw className={cn("size-3.5", scanQuery.isFetching && "animate-spin")} />
-              {scanQuery.isFetching ? t("project.scanning") : t("project.rescan")}
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  aria-label={scanQuery.isFetching ? t("project.scanning") : t("project.rescan")}
+                  onClick={() => void scanQuery.refetch()}
+                  disabled={scanQuery.isFetching}
+                >
+                  <RefreshCw className={cn("size-4", scanQuery.isFetching && "animate-spin")} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{t("project.rescan")}</TooltipContent>
+            </Tooltip>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="icon-sm" variant="ghost" aria-label={t("terminal.open")} title={t("terminal.open")}>
+                  <SquareTerminal className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => openTerminal("claude")}>
+                  <EcosystemGlyph ecosystem="claude" className="size-3.5" />
+                  Claude
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => openTerminal("codex")}>
+                  <EcosystemGlyph ecosystem="codex" className="size-3.5" />
+                  Codex
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => openTerminal("shell")}>
+                  <SquareTerminal className="size-3.5" />
+                  {t("terminal.shell")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </>
         }
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
-        <p className="mb-4 text-xs text-muted-foreground/60">
+        <p className="mb-5 text-xs text-muted-foreground/60">
           {project.lastOpenedAt
             ? t("projects.lastOpened", { when: relativeTime(t, project.lastOpenedAt) })
             : t("projects.never")}
           {scan && ` · ${t("project.scannedAt", { when: relativeTime(t, scan.scannedAt) })}`}
         </p>
         {scanQuery.isError && (
-          <p className="mb-4 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+          <p className="mb-4 max-w-5xl rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
             {t("project.scanFailed", { error: (scanQuery.error as Error).message })}
           </p>
         )}
 
-        <div className="grid max-w-4xl gap-4 sm:grid-cols-3">
+        <div className="flex max-w-5xl flex-col gap-6">
           {SECTIONS.map(({ kind, labelKey }) => (
-            <KindCard
+            <CapabilityTable
               key={kind}
               t={t}
               projectId={projectId}
               kind={kind}
               label={t(labelKey)}
-              scan={scan}
+              items={itemsOfKind(scan?.items ?? [], kind)}
+              loading={!scan}
             />
           ))}
-        </div>
 
-        {/* instruction files */}
-        <section className="mt-8 max-w-4xl">
-          <h2 className="mb-2 flex items-center gap-2 text-base font-display">
-            <FileText className="size-4 text-muted-foreground" />
-            {t("project.instructions")}
-          </h2>
-          {scan && scan.instructions.length === 0 && (
-            <p className="text-sm text-muted-foreground/70">{t("project.noInstructions")}</p>
-          )}
-          <ul className="flex flex-col gap-1">
-            {scan?.instructions.map((file) => (
-              <li key={file.id}>
-                <Link
-                  to="/p/$projectId/instructions/$fileId"
-                  params={{ projectId, fileId: file.id }}
-                  className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm transition-colors hover:bg-accent/60"
-                  title={file.path}
-                >
-                  <span className="min-w-0 flex-1 truncate font-mono text-[13px]">
-                    {file.relativePath}
-                  </span>
-                  <span className="shrink-0 text-xs text-muted-foreground/60">
-                    {formatBytes(file.bytes)}
-                  </span>
-                  <EcosystemBadge ecosystem={file.ecosystem} />
-                  <ScopeBadge scope={file.scope} />
-                  <span className="inline-flex shrink-0 items-center gap-1 text-[13px] text-primary">
-                    <Pencil className="size-3.5" />
-                    {t("instructions.edit")}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-          {scan && (
-            <CreateInstructions
-              t={t}
-              projectId={projectId}
-              projectName={project.name}
-              scan={scan}
-            />
-          )}
-        </section>
+          <InstructionsTable
+            t={t}
+            projectId={projectId}
+            projectName={project.name}
+            scan={scan}
+          />
 
-        {/* broken files */}
-        {(broken.length > 0 || (scan?.errors.length ?? 0) > 0) && (
-          <section className="mt-8 max-w-4xl">
-            <h2 className="mb-1 flex items-center gap-2 text-base font-display text-destructive">
-              <AlertTriangle className="size-4" />
-              {t("project.brokenTitle")}
-            </h2>
-            <p className="mb-2 text-sm text-muted-foreground/70">{t("project.brokenDesc")}</p>
-            <ul className="flex flex-col gap-1">
-              {broken.map((item) => (
-                <li key={item.id}>
-                  <Link
-                    to="/p/$projectId/item/$itemId"
-                    params={{ projectId, itemId: item.id }}
-                    className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm transition-colors hover:bg-destructive/10"
-                    title={item.sourceFile}
-                  >
-                    <span className="shrink-0 font-semibold">{item.name}</span>
-                    <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground/70">
-                      {item.parseError}
-                    </span>
-                    <EcosystemBadge ecosystem={item.ecosystem} />
-                  </Link>
-                </li>
-              ))}
+          {(scan?.errors.length ?? 0) > 0 && (
+            <Table
+              title={t("project.brokenTitle")}
+              icon={<AlertTriangle className="size-4 text-destructive" />}
+              count={scan?.errors.length ?? 0}
+              destructive
+            >
               {scan?.errors.map((err) => (
-                <li
-                  key={err.path}
-                  className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm"
-                >
-                  <span className="font-mono text-[13px]">{err.path}</span>
-                  <span className="ml-2 text-xs text-muted-foreground/70">{err.message}</span>
-                </li>
+                <tr key={err.path} className="border-t border-border">
+                  <td className="px-3 py-2 font-mono text-[13px] text-destructive">{err.path}</td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground/70" colSpan={3}>
+                    {err.message}
+                  </td>
+                </tr>
               ))}
-            </ul>
-          </section>
-        )}
+            </Table>
+          )}
+        </div>
       </div>
     </div>
+  );
+}
+
+/** The shared table frame: a titled header row, then the caller's `<tr>`s. */
+function Table({
+  title,
+  icon,
+  count,
+  action,
+  destructive,
+  children,
+}: {
+  title: string;
+  icon: ReactNode;
+  count: number;
+  action?: ReactNode;
+  destructive?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <section className="overflow-hidden rounded-xl border border-border">
+      <div className="flex items-center gap-2 bg-muted/40 px-3 py-2">
+        {icon}
+        <h2 className={cn("text-[13px] font-display", destructive && "text-destructive")}>{title}</h2>
+        <span className="text-xs tabular-nums text-muted-foreground/50">{count}</span>
+        {action && <div className="ml-auto">{action}</div>}
+      </div>
+      <table className="w-full border-collapse text-sm">
+        <tbody>{children}</tbody>
+      </table>
+    </section>
+  );
+}
+
+const EMPTY_ROW = (
+  <tr>
+    <td className="px-3 py-3 text-[13px] text-muted-foreground/50" colSpan={4} />
+  </tr>
+);
+
+/** One category as a table: every agent / MCP / skill, with a way to add one. */
+function CapabilityTable({
+  t,
+  projectId,
+  kind,
+  label,
+  items,
+  loading,
+}: {
+  t: TFunc;
+  projectId: string;
+  kind: CapabilityKind;
+  label: string;
+  items: ReturnType<typeof itemsOfKind>;
+  loading: boolean;
+}) {
+  const Icon = KIND_ICONS[kind];
+  return (
+    <Table
+      title={label}
+      icon={<Icon className="size-4 text-muted-foreground" />}
+      count={items.length}
+      action={
+        <Link
+          to="/p/$projectId/new/$kind"
+          params={{ projectId, kind }}
+          className="inline-flex items-center gap-1 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <Plus className="size-3.5" />
+          {t(`new.title.${kind}`)}
+        </Link>
+      }
+    >
+      {loading ? (
+        EMPTY_ROW
+      ) : items.length === 0 ? (
+        <tr>
+          <td className="px-3 py-2.5 text-[13px] text-muted-foreground/50" colSpan={4}>
+            {t("cap.none")}
+          </td>
+        </tr>
+      ) : (
+        items.map((item) => {
+          const broken = item.parseError != null;
+          const detail = broken
+            ? item.parseError
+            : "description" in (item.data ?? {})
+              ? ((item.data as { description?: string | null }).description ?? "")
+              : "";
+          return (
+            <tr key={item.id} className="border-t border-border">
+              <td className="w-px whitespace-nowrap py-2 pl-3 pr-2">
+                <Link
+                  to="/p/$projectId/item/$itemId"
+                  params={{ projectId, itemId: item.id }}
+                  className={cn(
+                    "inline-flex items-center gap-2 font-medium transition-colors hover:underline",
+                    broken ? "text-destructive" : "text-foreground",
+                  )}
+                  title={item.sourceFile}
+                >
+                  <ScopeIcon scope={item.scope} className={cn(broken && "text-destructive")} />
+                  {item.name}
+                </Link>
+              </td>
+              <td
+                className={cn(
+                  "max-w-0 truncate px-2 py-2 text-[13px]",
+                  broken ? "text-destructive/90" : "text-muted-foreground/70",
+                )}
+              >
+                {detail}
+              </td>
+              <td className="w-px whitespace-nowrap px-3 py-2 text-right">
+                <EcosystemBadge ecosystem={item.ecosystem} size="sm" />
+              </td>
+            </tr>
+          );
+        })
+      )}
+    </Table>
+  );
+}
+
+/** Instruction files as a table, with the "create CLAUDE.md / AGENTS.md" row. */
+function InstructionsTable({
+  t,
+  projectId,
+  projectName,
+  scan,
+}: {
+  t: TFunc;
+  projectId: string;
+  projectName: string;
+  scan: ProjectScan | undefined;
+}) {
+  const files = scan?.instructions ?? [];
+  return (
+    <Table
+      title={t("project.instructions")}
+      icon={<FileText className="size-4 text-muted-foreground" />}
+      count={files.length}
+    >
+      {files.length === 0 ? (
+        <tr>
+          <td className="px-3 py-2.5 text-[13px] text-muted-foreground/50" colSpan={4}>
+            {t("project.noInstructions")}
+          </td>
+        </tr>
+      ) : (
+        files.map((file) => (
+          <tr key={file.id} className="border-t border-border">
+            <td className="w-px whitespace-nowrap py-2 pl-3 pr-2">
+              <Link
+                to="/p/$projectId/instructions/$fileId"
+                params={{ projectId, fileId: file.id }}
+                className="inline-flex items-center gap-2 font-mono text-[13px] transition-colors hover:underline"
+                title={file.path}
+              >
+                <ScopeIcon scope={file.scope} />
+                {file.relativePath}
+              </Link>
+            </td>
+            <td className="px-2 py-2 text-xs text-muted-foreground/60">{formatBytes(file.bytes)}</td>
+            <td className="w-px whitespace-nowrap px-3 py-2 text-right">
+              <EcosystemBadge ecosystem={file.ecosystem} size="sm" />
+            </td>
+          </tr>
+        ))
+      )}
+      {scan && (
+        <tr className="border-t border-border">
+          <td colSpan={4} className="px-3 py-2">
+            <CreateInstructions t={t} projectId={projectId} projectName={projectName} scan={scan} />
+          </td>
+        </tr>
+      )}
+    </Table>
   );
 }
 
@@ -299,60 +442,3 @@ function CreateInstructions({
   );
 }
 
-/** Counts for one kind: total, per ecosystem, project vs global — and a way in. */
-function KindCard({
-  t,
-  projectId,
-  kind,
-  label,
-  scan,
-}: {
-  t: TFunc;
-  projectId: string;
-  kind: CapabilityKind;
-  label: string;
-  scan: ProjectScan | undefined;
-}) {
-  const Icon = KIND_ICONS[kind];
-  const items = scan?.items ?? [];
-  const total = scan ? countItems(items, { kind }) : null;
-
-  return (
-    <section className="rounded-xl border border-border bg-card p-5">
-      <h2 className="mb-2 flex items-center gap-2 text-base font-display">
-        <Icon className="size-4 text-muted-foreground" />
-        {label}
-        <span className="ml-auto text-2xl font-display tabular-nums">
-          {total === null ? "…" : total}
-        </span>
-      </h2>
-      {total === 0 && <p className="text-sm text-muted-foreground/70">{t("cap.none")}</p>}
-      {total !== null && total > 0 && (
-        <div className="flex flex-col gap-1 text-sm text-muted-foreground/80">
-          <div className="flex flex-wrap items-center gap-2">
-            {ECOSYSTEMS.filter((eco) => countItems(items, { kind, ecosystem: eco }) > 0).map(
-              (eco) => (
-                <span key={eco} className="flex items-center gap-1">
-                  <EcosystemBadge ecosystem={eco} />
-                  <span className="tabular-nums">{countItems(items, { kind, ecosystem: eco })}</span>
-                </span>
-              ),
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground/60">
-            {t("project.countProject", { n: countItems(items, { kind, scope: "project" }) })} ·{" "}
-            {t("project.countGlobal", { n: countItems(items, { kind, scope: "global" }) })}
-          </p>
-        </div>
-      )}
-      <Link
-        to="/p/$projectId/new/$kind"
-        params={{ projectId, kind }}
-        className="mt-3 inline-flex items-center gap-1.5 text-[13px] text-primary transition-opacity hover:opacity-80"
-      >
-        <Plus className="size-3.5" />
-        {t(`new.title.${kind}`)}
-      </Link>
-    </section>
-  );
-}

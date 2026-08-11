@@ -56,6 +56,21 @@ if (target === "node") {
   new Database(":memory:").close();
   console.log("native deps: better-sqlite3 ready for Node");
 } else {
-  run(npx, ["electron-builder", "install-app-deps"]);
-  console.log("native deps: better-sqlite3 ready for Electron");
+  // `install-app-deps` rebuilds every native module for the Electron ABI, in
+  // dependency order: better-sqlite3 (required) before node-pty (optional).
+  // node-pty builds from source, so on a machine that cannot fetch Electron
+  // headers it fails — but better-sqlite3 has already finished by then, and the
+  // terminals panel degrades to a piped fallback without a PTY. So a node-pty
+  // failure is a warning, not a fatal build error.
+  try {
+    run(npx, ["electron-builder", "install-app-deps"]);
+    console.log("native deps: better-sqlite3 + node-pty ready for Electron");
+  } catch {
+    console.warn(
+      "native deps: a native module failed to rebuild for Electron (usually " +
+        "node-pty, which needs Electron headers). better-sqlite3 rebuilds first " +
+        "and is ready; terminals will use the piped fallback until node-pty can " +
+        "be rebuilt with network access.",
+    );
+  }
 }

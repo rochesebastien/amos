@@ -58,6 +58,13 @@ export const dict: Record<Lang, Record<string, string>> = {
     "sidebar.collapseProject": "Hide capabilities",
     "sidebar.scanning": "Scanning…",
     "sidebar.sectionEmpty": "None",
+    "sidebar.conversations": "Conversations",
+    "terminal.open": "Open a terminal",
+    "terminal.new": "New terminal",
+    "terminal.shell": "Shell",
+    "terminal.hide": "Hide terminals",
+    "terminal.closeTab": "Close terminal",
+    "terminal.failed": "This terminal could not start.",
 
     // welcome / recents
     "welcome.title": "Agentic Management and Orchestrator Software",
@@ -376,6 +383,13 @@ export const dict: Record<Lang, Record<string, string>> = {
     "sidebar.collapseProject": "Masquer les capacités",
     "sidebar.scanning": "Analyse…",
     "sidebar.sectionEmpty": "Aucun",
+    "sidebar.conversations": "Conversations",
+    "terminal.open": "Ouvrir un terminal",
+    "terminal.new": "Nouveau terminal",
+    "terminal.shell": "Shell",
+    "terminal.hide": "Masquer les terminaux",
+    "terminal.closeTab": "Fermer le terminal",
+    "terminal.failed": "Ce terminal n\u2019a pas pu démarrer.",
 
     "welcome.title": "Agentic Management and Orchestrator Software",
     "welcome.subtitle":

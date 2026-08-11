@@ -20,12 +20,12 @@ import {
 import { itemsOfKind, type CapabilityKind } from "@shared/capabilities";
 import { useApp } from "@/lib/store";
 import { useT, type TFunc } from "@/lib/i18n";
-import { useProjectMutations, useProjects, useProjectScan } from "@/lib/queries";
+import { useChatSessions, useProjectMutations, useProjects, useProjectScan } from "@/lib/queries";
 import { ipc, type Project } from "@/lib/ipc";
 import { useSidebar, type ProjectSort, SIDEBAR_RAIL } from "@/lib/sidebar";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useConfirm } from "@/components/ui/confirm";
-import { BrokenBadge, EcosystemBadge, KIND_ICONS, ScopeIcon } from "@/components/CapabilityBadges";
+import { EcosystemBadge, KIND_ICONS, ScopeIcon } from "@/components/CapabilityBadges";
 import { SearchPalette } from "@/components/SearchPalette";
 import { cn } from "@/lib/utils";
 import { LogoMark, LogoWordmark } from "@/components/Logo";
@@ -539,18 +539,7 @@ function ProjectRow({
       </div>
 
       {open && (
-        <div className="my-0.5 ml-5 border-l border-sidebar-border pl-1.5">
-          <Link
-            to="/p/$projectId/chat"
-            params={{ projectId: project.id }}
-            className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px] text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
-            activeProps={{
-              className: "bg-sidebar-accent text-sidebar-accent-foreground",
-            }}
-          >
-            <MessageSquare className="size-3" />
-            <span className="min-w-0 flex-1 truncate">{t("chat.title")}</span>
-          </Link>
+        <div className="mb-1 mt-0.5 ml-[1.35rem] flex flex-col gap-0.5 border-l border-sidebar-border pl-2">
           {isPending && (
             <p className="px-2 py-1 text-[12px] text-muted-foreground/60">
               {t("sidebar.scanning")}
@@ -572,7 +561,53 @@ function ProjectRow({
                 items={itemsOfKind(scan.items, section.kind)}
               />
             ))}
+          <ConversationsSection t={t} projectId={project.id} />
         </div>
+      )}
+    </div>
+  );
+}
+
+/** The project's saved chats, listed like a capability section. */
+function ConversationsSection({ t, projectId }: { t: TFunc; projectId: string }) {
+  const { data: sessions = [] } = useChatSessions(projectId);
+  return (
+    <div className="group/section py-0.5">
+      <div className="flex items-center gap-2 px-2 py-1 text-[13px] text-muted-foreground">
+        <MessageSquare className="size-3.5" />
+        <span className="truncate">{t("sidebar.conversations")}</span>
+        <span className="text-[11px] text-muted-foreground/50">{sessions.length}</span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Link
+              to="/p/$projectId/chat"
+              params={{ projectId }}
+              aria-label={t("chat.newChat")}
+              className="ml-auto rounded p-0.5 opacity-0 transition-opacity hover:bg-sidebar-accent hover:text-foreground focus-visible:opacity-100 group-hover/section:opacity-100"
+            >
+              <Plus className="size-3.5" />
+            </Link>
+          </TooltipTrigger>
+          <TooltipContent side="right">{t("chat.newChat")}</TooltipContent>
+        </Tooltip>
+      </div>
+      {sessions.length === 0 ? (
+        <p className="px-2 pb-0.5 pl-4 text-[12px] text-muted-foreground/50">
+          {t("sidebar.sectionEmpty")}
+        </p>
+      ) : (
+        sessions.map((session) => (
+          <Link
+            key={session.id}
+            to="/p/$projectId/chat/$sessionId"
+            params={{ projectId, sessionId: session.id }}
+            title={session.title || t("chat.untitled")}
+            className="flex items-center gap-1.5 rounded-md py-1 pl-4 pr-2 text-[12px] text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
+            activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
+          >
+            <span className="min-w-0 flex-1 truncate">{session.title || t("chat.untitled")}</span>
+          </Link>
+        ))
       )}
     </div>
   );
@@ -618,23 +653,26 @@ function CapabilitySection({
           {t("sidebar.sectionEmpty")}
         </p>
       ) : (
-        items.map((item) => (
-          <Link
-            key={item.id}
-            to="/p/$projectId/item/$itemId"
-            params={{ projectId, itemId: item.id }}
-            title={item.sourceFile}
-            className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px] text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
-            activeProps={{
-              className: "bg-sidebar-accent text-sidebar-accent-foreground",
-            }}
-          >
-            <ScopeIcon scope={item.scope} />
-            <span className="min-w-0 flex-1 truncate">{item.name}</span>
-            {item.parseError != null && <BrokenBadge size="sm" />}
-            <EcosystemBadge ecosystem={item.ecosystem} size="sm" />
-          </Link>
-        ))
+        items.map((item) => {
+          const broken = item.parseError != null;
+          return (
+            <Link
+              key={item.id}
+              to="/p/$projectId/item/$itemId"
+              params={{ projectId, itemId: item.id }}
+              title={broken ? (item.parseError ?? undefined) : item.sourceFile}
+              className={cn(
+                "flex items-center gap-1.5 rounded-md py-1 pl-4 pr-2 text-[12px] transition-colors hover:bg-sidebar-accent/60",
+                broken ? "text-destructive" : "text-muted-foreground",
+              )}
+              activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
+            >
+              <ScopeIcon scope={item.scope} className={cn(broken && "text-destructive")} />
+              <span className="min-w-0 flex-1 truncate">{item.name}</span>
+              <EcosystemBadge ecosystem={item.ecosystem} size="sm" />
+            </Link>
+          );
+        })
       )}
     </div>
   );

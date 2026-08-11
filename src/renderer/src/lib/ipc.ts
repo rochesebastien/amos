@@ -22,6 +22,7 @@ import type {
   ChatSessionDetail,
   CliDetection,
 } from "@shared/chat";
+import type { TerminalDataEvent, TerminalExitEvent, TerminalKind } from "@shared/terminal";
 
 export type {
   Project,
@@ -99,4 +100,13 @@ export const ipc = {
 
   getSetting: (key: string) => bridge().settings.get({ key }),
   setSetting: (key: string, value: string) => bridge().settings.set({ key, value }),
+
+  createTerminal: (input: { projectId: string; kind: TerminalKind; cols: number; rows: number }) =>
+    bridge().terminal.create(input),
+  writeTerminal: (id: string, data: string) => bridge().terminal.write({ id, data }),
+  resizeTerminal: (id: string, cols: number, rows: number) =>
+    bridge().terminal.resize({ id, cols, rows }),
+  killTerminal: (id: string) => bridge().terminal.kill({ id }),
+  onTerminalData: (listener: (event: TerminalDataEvent) => void) => bridge().terminal.onData(listener),
+  onTerminalExit: (listener: (event: TerminalExitEvent) => void) => bridge().terminal.onExit(listener),
 };
