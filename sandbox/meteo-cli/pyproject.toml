@@ -1,0 +1,9 @@
+[project]
+name = "meteo-cli"
+version = "0.4.0"
+description = "Fictional weather CLI used to exercise AMOS (Claude-only project)."
+requires-python = ">=3.11"
+dependencies = ["httpx>=0.27", "rich>=13.0"]
+
+[project.scripts]
+meteo = "meteo.cli:main"

@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "postgres": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres", "postgresql://localhost/webshop"],
+      "env": { "PGUSER": "dev" }
+    },
+    "stripe-docs": {
+      "type": "http",
+      "url": "https://docs.stripe.example.com/mcp"
+    },
+    "browser": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-puppeteer"]
+    }
+  }
+}

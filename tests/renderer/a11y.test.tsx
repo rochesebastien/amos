@@ -9,39 +9,13 @@
 // really rendered here and every control is required to have an accessible
 // name, computed by the same algorithm assistive technology uses.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import {
-  createMemoryHistory,
-  createRootRoute,
-  createRouter,
-  RouterProvider,
-} from "@tanstack/react-router";
+import { cleanup, screen, within } from "@testing-library/react";
 import type { AgentItem } from "@shared/capabilities";
-import type { Project } from "@shared/ipc";
 import { Sidebar } from "@/components/Sidebar";
 import { AgentEditor } from "@/components/editors/AgentEditor";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { ConfirmProvider } from "@/components/ui/confirm";
 import { useSidebar } from "@/lib/sidebar";
 import { dict } from "@/lib/dictionaries";
-
-const PROJECTS: Project[] = [
-  {
-    id: "p1",
-    path: "/home/dev/amos",
-    name: "amos",
-    createdAt: "2026-01-01T00:00:00.000Z",
-    lastOpenedAt: "2026-01-02T00:00:00.000Z",
-  },
-  {
-    id: "p2",
-    path: "/home/dev/other",
-    name: "other",
-    createdAt: "2026-01-01T00:00:00.000Z",
-    lastOpenedAt: null,
-  },
-];
+import { installBridge, PROJECTS, renderInApp } from "./helpers";
 
 const AGENT: AgentItem = {
   id: "a1",
@@ -60,36 +34,6 @@ const AGENT: AgentItem = {
     body: "You review code.",
   },
 };
-
-/** Enough of the preload bridge for the components under test. */
-function installBridge() {
-  window.amos = {
-    projects: { list: async () => PROJECTS },
-    scan: { project: async () => ({ items: [], instructions: [] }) },
-    settings: { get: async () => ({ key: "", value: null }) },
-  } as unknown as typeof window.amos;
-}
-
-/** Render `ui` with the providers the app shell gives it. */
-function renderInApp(ui: React.ReactNode) {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  });
-  const rootRoute = createRootRoute({ component: () => <>{ui}</> });
-  const router = createRouter({
-    routeTree: rootRoute,
-    history: createMemoryHistory({ initialEntries: ["/"] }),
-  });
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <ConfirmProvider>
-          <RouterProvider router={router as never} />
-        </ConfirmProvider>
-      </TooltipProvider>
-    </QueryClientProvider>,
-  );
-}
 
 /**
  * Elements of `role` that no assistive technology could announce. Both queries

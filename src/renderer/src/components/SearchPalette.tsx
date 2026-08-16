@@ -25,13 +25,13 @@ import { cn } from "@/lib/utils";
  * corpus is a few hundred names, not a search problem.
  */
 
-type Hit =
+export type Hit =
   | { type: "project"; project: Project }
   | { type: "item"; projectId: string; projectName: string; item: CapabilityItem }
   | { type: "instruction"; projectId: string; projectName: string; file: InstructionFile }
   | { type: "chat"; projectId: string; projectName: string; session: ChatSession };
 
-type ProjectSources = {
+export type ProjectSources = {
   project: Project;
   scan: ProjectScan | null;
   sessions: ChatSession[];
@@ -57,7 +57,7 @@ function matches(query: string, ...texts: (string | null | undefined)[]): boolea
   return texts.some((s) => s != null && s.toLowerCase().includes(query));
 }
 
-function search(sources: ProjectSources[], rawQuery: string): Hit[] {
+export function search(sources: ProjectSources[], rawQuery: string): Hit[] {
   const query = rawQuery.trim().toLowerCase();
   const all: Hit[] = [];
   for (const { project, scan, sessions } of sources) {
@@ -262,28 +262,8 @@ export function SearchPalette({ open, onClose }: { open: boolean; onClose: () =>
             );
           })}
         </div>
-
-        <div className="flex items-center gap-3 border-t border-border px-4 py-2 text-[11px] text-muted-foreground/70">
-          <span>
-            <Kbd>↑↓</Kbd> {t("search.hintNavigate")}
-          </span>
-          <span>
-            <Kbd>↵</Kbd> {t("search.hintOpen")}
-          </span>
-          <span>
-            <Kbd>esc</Kbd> {t("search.hintClose")}
-          </span>
-        </div>
       </div>
     </div>
-  );
-}
-
-function Kbd({ children }: { children: React.ReactNode }) {
-  return (
-    <kbd className="rounded border border-border bg-muted px-1 py-px font-sans text-[10px]">
-      {children}
-    </kbd>
   );
 }
 

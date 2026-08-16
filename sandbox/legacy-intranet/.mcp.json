@@ -1,0 +1,4 @@
+{
+  "mcpServers": {
+    "ldap": { "command": "ldap-mcp", "args": ["--stdio"], },
+}

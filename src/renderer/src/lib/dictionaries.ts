@@ -42,9 +42,6 @@ export const dict: Record<Lang, Record<string, string>> = {
     "search.start": "Type to search across your projects.",
     "search.empty": "No results for “{query}”",
     "search.chats": "Conversations",
-    "search.hintNavigate": "navigate",
-    "search.hintOpen": "open",
-    "search.hintClose": "close",
 
     "sidebar.label": "Sidebar",
     "sidebar.projects": "Projects",
@@ -367,9 +364,6 @@ export const dict: Record<Lang, Record<string, string>> = {
     "search.start": "Tapez pour chercher dans vos projets.",
     "search.empty": "Aucun résultat pour « {query} »",
     "search.chats": "Conversations",
-    "search.hintNavigate": "naviguer",
-    "search.hintOpen": "ouvrir",
-    "search.hintClose": "fermer",
 
     "sidebar.label": "Panneau latéral",
     "sidebar.projects": "Projets",

@@ -1,0 +1,10 @@
+model = "gpt-5-codex"
+approval_policy = "never"
+
+[mcp_servers.aseprite]
+command = "aseprite-mcp"
+args = ["--stdio"]
+
+[mcp_servers.gamedocs]
+url = "https://docs.pixelrunner.example.com/mcp"
+bearer_token_env_var = "GAMEDOCS_TOKEN"

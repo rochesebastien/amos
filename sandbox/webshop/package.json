@@ -1,0 +1,16 @@
+{
+  "name": "webshop",
+  "version": "2.3.1",
+  "private": true,
+  "description": "Fictional e-commerce storefront used to exercise AMOS.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "react": "^18.3.1",
+    "stripe": "^17.0.0"
+  }
+}

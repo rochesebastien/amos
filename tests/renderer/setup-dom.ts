@@ -22,6 +22,11 @@ if (typeof window !== "undefined") {
   // "Not implemented" stack on every navigation.
   window.scrollTo = (() => {}) as typeof window.scrollTo;
 
+  // Same story for the palette keeping its active row in view.
+  if (!Element.prototype.scrollIntoView) {
+    Element.prototype.scrollIntoView = () => {};
+  }
+
   if (!("ResizeObserver" in window)) {
     class ResizeObserverStub {
       observe() {}

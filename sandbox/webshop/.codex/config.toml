@@ -1,0 +1,10 @@
+model = "gpt-5-codex"
+approval_policy = "on-request"
+
+[mcp_servers.postgres]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-postgres", "postgresql://localhost/webshop"]
+
+[mcp_servers.stripe-docs]
+url = "https://docs.stripe.example.com/mcp"
+bearer_token_env_var = "STRIPE_DOCS_TOKEN"

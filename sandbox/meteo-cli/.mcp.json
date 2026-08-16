@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "openmeteo": {
+      "type": "http",
+      "url": "https://api.open-meteo.example.com/mcp"
+    }
+  }
+}
