@@ -7,7 +7,7 @@ const variants: Record<Variant, string> = {
   default: "bg-foreground text-background",
   secondary: "bg-secondary text-secondary-foreground",
   outline: "border border-border text-muted-foreground",
-  primary: "bg-primary/15 text-foreground border border-primary/30",
+  primary: "bg-muted text-foreground border border-border",
 };
 
 export const Badge = React.forwardRef<
@@ -17,7 +17,7 @@ export const Badge = React.forwardRef<
   <span
     ref={ref}
     className={cn(
-      "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold",
+      "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium",
       variants[variant],
       className,
     )}

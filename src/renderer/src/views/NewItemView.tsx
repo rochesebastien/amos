@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "@tanstack/react-router";
-import { ArrowLeft, Plus } from "lucide-react";
+import { useNavigate, useParams } from "@tanstack/react-router";
+import { ViewHeader } from "@/components/ViewHeader";
+import { Plus } from "lucide-react";
 import {
   capabilityId,
   ECOSYSTEMS,
@@ -134,23 +135,18 @@ export function NewItemView() {
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
-      <header className="px-8 pt-8 pb-4">
-        <Link
-          to="/p/$projectId"
-          params={{ projectId }}
-          className="mb-3 inline-flex items-center gap-1.5 text-[13px] text-muted-foreground/70 transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="size-3.5" />
-          {t("cap.backToProject")}
-        </Link>
-        <h1 className="flex items-center gap-3 text-3xl font-display">
-          <Icon className="size-7 shrink-0 text-primary" />
-          {t(`new.title.${kind}`)}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground/70">{t(`new.subtitle.${kind}`)}</p>
-      </header>
+      <ViewHeader
+        backTo="/p/$projectId"
+        backParams={{ projectId }}
+        backLabel={t("cap.backToProject")}
+        icon={<Icon className="size-4" />}
+        title={t(`new.title.${kind}`)}
+      />
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-10">
+      <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
+        <p className="mb-4 max-w-2xl text-sm text-muted-foreground/70">
+          {t(`new.subtitle.${kind}`)}
+        </p>
         {isPending ? (
           <p className="text-sm text-muted-foreground/70">{t("project.scanning")}</p>
         ) : (

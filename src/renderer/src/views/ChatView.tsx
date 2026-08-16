@@ -31,7 +31,9 @@ import { ipc } from "@/lib/ipc";
 import { useChatStream, useChatStreams, type StreamTool } from "@/lib/chatStream";
 import { relativeTime, useT, type TFunc } from "@/lib/i18n";
 import { Markdown } from "@/components/Markdown";
+import { EcosystemGlyph } from "@/components/BrandIcons";
 import { ChatSetupScreen } from "./ChatSetupScreen";
+import { ViewHeader } from "@/components/ViewHeader";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import {
@@ -224,35 +226,41 @@ export function ChatView() {
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
-      <header className="flex items-center gap-2 border-b border-border px-6 py-3">
-        <h1 className="min-w-0 flex-1 truncate text-base font-display">
-          {detail?.session.title || t("chat.newChat")}
-        </h1>
-
-        <SessionMenu
-          t={t}
-          sessions={sessions}
-          activeId={sessionId}
-          onOpen={(id) =>
-            void navigate({ to: "/p/$projectId/chat/$sessionId", params: { projectId, sessionId: id } })
-          }
-          onDelete={(id, title) => void removeSession(id, title)}
-        />
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              size="icon"
-              variant="ghost"
-              aria-label={t("chat.newChat")}
-              onClick={() => void navigate({ to: "/p/$projectId/chat", params: { projectId } })}
-            >
-              <MessageSquarePlus className="size-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{t("chat.newChat")}</TooltipContent>
-        </Tooltip>
-      </header>
+      <ViewHeader
+        backTo="/p/$projectId"
+        backParams={{ projectId }}
+        backLabel={t("cap.backToProject")}
+        title={detail?.session.title || t("chat.newChat")}
+        actions={
+          <>
+            <SessionMenu
+              t={t}
+              sessions={sessions}
+              activeId={sessionId}
+              onOpen={(id) =>
+                void navigate({
+                  to: "/p/$projectId/chat/$sessionId",
+                  params: { projectId, sessionId: id },
+                })
+              }
+              onDelete={(id, title) => void removeSession(id, title)}
+            />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  aria-label={t("chat.newChat")}
+                  onClick={() => void navigate({ to: "/p/$projectId/chat", params: { projectId } })}
+                >
+                  <MessageSquarePlus className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{t("chat.newChat")}</TooltipContent>
+            </Tooltip>
+          </>
+        }
+      />
 
       {empty ? (
         <div className="min-h-0 flex-1 overflow-y-auto">
@@ -386,7 +394,8 @@ function BackendPicker({
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <span className="flex h-9 items-center rounded-lg px-2 text-[13px] text-muted-foreground">
+          <span className="flex h-9 items-center gap-1.5 rounded-md px-2 text-[13px] text-muted-foreground">
+            <BackendGlyph backend={value} />
             {t(`chat.backend.${value}`)}
           </span>
         </TooltipTrigger>
@@ -402,6 +411,7 @@ function BackendPicker({
           type="button"
           className="flex h-9 max-w-[160px] items-center gap-1 rounded-lg px-2 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
+          <BackendGlyph backend={value} />
           <span className="truncate">{t(`chat.backend.${value}`)}</span>
           <ChevronDown className="size-3.5 shrink-0" />
         </button>
@@ -416,12 +426,19 @@ function BackendPicker({
                 value === candidate ? "opacity-100" : "opacity-0",
               )}
             />
+            <BackendGlyph backend={candidate} />
             <span className="flex-1 truncate">{t(`chat.backend.${candidate}`)}</span>
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );
+}
+
+/** The mark of a chat backend, when that backend is one of the two CLIs. */
+function BackendGlyph({ backend }: { backend: ChatBackend }) {
+  if (backend !== "claude" && backend !== "codex") return null;
+  return <EcosystemGlyph ecosystem={backend} className="size-3.5 shrink-0" />;
 }
 
 /** The project's past conversations. */

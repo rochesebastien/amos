@@ -183,6 +183,8 @@ operation goes through a typed IPC channel validated in the main process.
 
 ## Design
 
-See [`DESIGN.md`](./DESIGN.md) — tokens, typography, the brand mark, and the
-layout rules the UI follows. Palette: primary `#00ED64`, background `#FFFFEB`,
-secondary `#001E2B`, in **Mona Sans**.
+See [`DESIGN.md`](./DESIGN.md) — tokens, typography, the marks, and the layout
+rules the UI follows. Monochrome by design: one neutral ramp (white → `#0a0a0a`,
+inverted in dark mode), hairline borders, **Mona Sans** at two weights, and red
+kept for errors only. Each capability is badged with its ecosystem's mark rather
+than the words "Claude" / "Codex".

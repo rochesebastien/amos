@@ -1,49 +1,60 @@
+import markUrl from "@/assets/logo-mark.png";
+import wordmarkUrl from "@/assets/logo-wordmark.png";
 import { cn } from "@/lib/utils";
 
-// AMOS brand marks. Placeholder identity: an orchestration glyph — one hub
-// node wired to three satellites, i.e. the app driving a project's agents,
-// skills and MCP servers.
+// AMOS brand marks: a five-bladed pinwheel, and the wordmark that sets it as
+// the "o" of the product name.
 //
-// Drawn inline rather than imported as an image so both marks follow the
-// theme: the satellites and wires take the surrounding text colour, the hub
-// takes the primary token. `src/renderer/src/assets/logo.svg` is the same
-// geometry with fixed colours, for the favicon and the packaged app icon.
+// Both ship as white-on-transparent PNGs, and neither is drawn — they are used
+// as CSS masks over `currentColor`. That is what keeps a raster asset inside
+// the monochrome system: the alpha channel is the shape, the surrounding text
+// colour is the ink, so one file is black on the light theme and white on the
+// dark one with nothing to swap. `assets/logo-mark.png` is also the source
+// `scripts/gen-icons.mjs` rasterises into the packaged app icons.
 
-const SATELLITES = [
-  { cx: 32, cy: 12 },
-  { cx: 14.68, cy: 42 },
-  { cx: 49.32, cy: 42 },
-] as const;
+/** Shared mask plumbing: paint `currentColor` through a PNG's alpha. */
+function maskStyle(url: string): React.CSSProperties {
+  return {
+    WebkitMaskImage: `url(${url})`,
+    maskImage: `url(${url})`,
+    WebkitMaskRepeat: "no-repeat",
+    maskRepeat: "no-repeat",
+    WebkitMaskPosition: "center",
+    maskPosition: "center",
+    WebkitMaskSize: "contain",
+    maskSize: "contain",
+  };
+}
 
+/** Intrinsic ratio of the trimmed wordmark, so height alone sizes it. */
+const WORDMARK_RATIO = 1274 / 302;
+
+/**
+ * The glyph alone — the collapsed sidebar rail, message avatars, empty states.
+ * Size it with a square utility (`size-8`).
+ */
 export function LogoMark({ className }: { className?: string }) {
   return (
-    <svg
-      viewBox="0 0 64 64"
+    <span
       role="presentation"
       aria-hidden="true"
-      className={cn("shrink-0", className)}
-    >
-      <g stroke="currentColor" strokeWidth={3.2} strokeLinecap="round" opacity={0.45}>
-        {SATELLITES.map((s) => (
-          <line key={`${s.cx}`} x1={32} y1={32} x2={s.cx} y2={s.cy} />
-        ))}
-      </g>
-      <g fill="currentColor">
-        {SATELLITES.map((s) => (
-          <circle key={`${s.cx}`} cx={s.cx} cy={s.cy} r={4.6} />
-        ))}
-      </g>
-      <circle cx={32} cy={32} r={7} className="fill-primary" />
-    </svg>
+      className={cn("block shrink-0 bg-current", className)}
+      style={maskStyle(markUrl)}
+    />
   );
 }
 
-/** The mark next to the product name, for sidebar headers and empty states. */
+/**
+ * The full wordmark — the expanded sidebar and the welcome screen. Give it a
+ * height (`h-5`); the width follows from the artwork's ratio.
+ */
 export function LogoWordmark({ className }: { className?: string }) {
   return (
-    <div className={cn("flex items-center gap-2.5", className)}>
-      <LogoMark className="size-8" />
-      <span className="font-display text-2xl leading-none tracking-tight">AMOS</span>
-    </div>
+    <span
+      role="img"
+      aria-label="AMOS"
+      className={cn("block shrink-0 bg-current", className)}
+      style={{ ...maskStyle(wordmarkUrl), aspectRatio: WORDMARK_RATIO }}
+    />
   );
 }

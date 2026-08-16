@@ -2,6 +2,8 @@ import { Link } from "@tanstack/react-router";
 import { AlertCircle, CheckCircle2, RefreshCw, Settings as SettingsIcon, Terminal } from "lucide-react";
 import { CLI_VENDORS, type CliDetection, type CliVendor } from "@shared/chat";
 import { useT, type TFunc } from "@/lib/i18n";
+import { ViewHeader } from "@/components/ViewHeader";
+import { EcosystemGlyph } from "@/components/BrandIcons";
 import { useRecheckClis } from "@/lib/queries";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -34,14 +36,12 @@ export function ChatSetupScreen({ detection }: { detection: CliDetection | undef
   const recheck = useRecheckClis();
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="mx-auto w-full max-w-2xl px-6 py-10">
+    <div className="flex min-w-0 flex-1 flex-col">
+      <ViewHeader icon={<Terminal className="size-4" />} title={t("setup.title")} />
+      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="mx-auto w-full max-w-2xl px-6 py-8">
         <header className="mb-6">
-          <h1 className="flex items-center gap-3 text-2xl font-display">
-            <Terminal className="size-6 shrink-0 text-primary" />
-            {t("setup.title")}
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground">{t("setup.subtitle")}</p>
+          <p className="text-sm text-muted-foreground">{t("setup.subtitle")}</p>
           <p className="mt-1 text-sm text-muted-foreground/70">{t("setup.noKeys")}</p>
         </header>
 
@@ -69,6 +69,7 @@ export function ChatSetupScreen({ detection }: { detection: CliDetection | undef
           <p className="mt-4 text-[12px] text-muted-foreground/60">{t("setup.echoHint")}</p>
         )}
       </div>
+      </div>
     </div>
   );
 }
@@ -94,6 +95,7 @@ function VendorCard({
         ) : (
           <AlertCircle className="size-4 text-muted-foreground/60" />
         )}
+        <EcosystemGlyph ecosystem={vendor} className="size-4" />
         {t(`cap.eco.${vendor}`)}
         <span className="ml-auto text-[12px] font-normal text-muted-foreground/70">
           {status?.installed

@@ -8,6 +8,7 @@ import {
   type CliVendor,
 } from "@shared/chat";
 import { relativeTime, useT, type TFunc } from "@/lib/i18n";
+import { EcosystemGlyph } from "@/components/BrandIcons";
 import { useCliDetection, useRecheckClis, useSetting, useSettingMutation } from "@/lib/queries";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/select";
@@ -110,6 +111,7 @@ function VendorRow({
       />
       <div className="min-w-0 flex-1">
         <p className="flex items-center gap-2 text-sm font-medium">
+          <EcosystemGlyph ecosystem={vendor} className="size-3.5" />
           {t(`cap.eco.${vendor}`)}
           <span className="text-[12px] font-normal text-muted-foreground/70">
             {state === "ready"

@@ -10,6 +10,7 @@ import {
 import { Sidebar } from "@/components/Sidebar";
 import { ScanSync } from "@/components/ScanSync";
 import { ChatSync } from "@/components/ChatSync";
+import { TerminalPanel } from "@/components/TerminalPanel";
 import { SettingsLayout } from "@/views/settings/SettingsLayout";
 import { WelcomeView } from "@/views/WelcomeView";
 import { ProjectView } from "@/views/ProjectView";
@@ -33,6 +34,7 @@ function RootShell() {
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Outlet />
       </main>
+      <TerminalPanel />
     </div>
   );
 }

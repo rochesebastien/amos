@@ -7,7 +7,7 @@ import { relativeTime, useT } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useConfirm } from "@/components/ui/confirm";
-import { LogoMark } from "@/components/Logo";
+import { LogoWordmark } from "@/components/Logo";
 
 /**
  * The landing view: pick a folder to manage, or jump back into a recent one.
@@ -65,8 +65,8 @@ export function WelcomeView() {
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-8 py-16">
         <header className="flex flex-col items-center gap-4 text-center">
-          <LogoMark className="size-20" />
-          <h1 className="text-3xl font-display">{t("welcome.title")}</h1>
+          <LogoWordmark className="h-11" />
+          <h1 className="text-xl font-display">{t("welcome.title")}</h1>
           <p className="max-w-lg text-sm text-muted-foreground/80">{t("welcome.subtitle")}</p>
           <Button size="lg" onClick={() => void openFolder()} disabled={busy}>
             <FolderPlus className="size-4" />

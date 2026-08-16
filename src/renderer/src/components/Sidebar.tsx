@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Home,
+  Search,
   Settings as SettingsIcon,
   Moon,
   Sun,
@@ -19,12 +20,13 @@ import {
 import { itemsOfKind, type CapabilityKind } from "@shared/capabilities";
 import { useApp } from "@/lib/store";
 import { useT, type TFunc } from "@/lib/i18n";
-import { useProjectMutations, useProjects, useProjectScan } from "@/lib/queries";
+import { useChatSessions, useProjectMutations, useProjects, useProjectScan } from "@/lib/queries";
 import { ipc, type Project } from "@/lib/ipc";
 import { useSidebar, type ProjectSort, SIDEBAR_RAIL } from "@/lib/sidebar";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useConfirm } from "@/components/ui/confirm";
-import { CapabilityBadges, KIND_ICONS } from "@/components/CapabilityBadges";
+import { EcosystemBadge, KIND_ICONS, ScopeIcon } from "@/components/CapabilityBadges";
+import { SearchPalette } from "@/components/SearchPalette";
 import { cn } from "@/lib/utils";
 import { LogoMark, LogoWordmark } from "@/components/Logo";
 
@@ -44,6 +46,19 @@ export function Sidebar() {
   const { data: projects = [] } = useProjects();
   const { add, remove, touch } = useProjectMutations();
   const [sortOpen, setSortOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  // ⌘K / Ctrl+K opens the search palette from anywhere in the app frame.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setSearchOpen((o) => !o);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const activeProjectId = pathname.startsWith("/p/") ? (pathname.split("/")[2] ?? null) : null;
   const onHome = pathname === "/";
@@ -115,7 +130,7 @@ export function Sidebar() {
         style={{ width: SIDEBAR_RAIL }}
         className="flex h-full shrink-0 flex-col items-center gap-1 border-r border-sidebar-border bg-sidebar py-4 text-sidebar-foreground"
       >
-        <LogoMark className="mb-1 size-8" />
+        <LogoMark className="mb-1 size-7" />
         <div className="my-1 h-px w-6 bg-sidebar-border" />
         <Tooltip>
           <TooltipTrigger asChild>
@@ -133,6 +148,19 @@ export function Sidebar() {
             </Link>
           </TooltipTrigger>
           <TooltipContent side="right">{t("nav.home")}</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              aria-label={t("nav.search")}
+              className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
+            >
+              <Search className="size-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right">{t("nav.search")}</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -223,6 +251,7 @@ export function Sidebar() {
           </TooltipTrigger>
           <TooltipContent side="right">{t("nav.expandSidebar")}</TooltipContent>
         </Tooltip>
+        <SearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
       </aside>
     );
   }
@@ -235,8 +264,8 @@ export function Sidebar() {
       className="relative flex h-full shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
     >
       {/* brand */}
-      <div className="px-3 pt-4 pb-3">
-        <LogoWordmark className="px-4 py-1.5" />
+      <div className="px-7 pt-5 pb-4">
+        <LogoWordmark className="h-5" />
       </div>
 
       {/* nav */}
@@ -246,13 +275,24 @@ export function Sidebar() {
           className={cn(
             "flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors",
             onHome
-              ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
+              ? "bg-sidebar-accent text-sidebar-accent-foreground"
               : "text-muted-foreground hover:bg-sidebar-accent/60",
           )}
         >
           <Home className={cn("size-4", onHome && "text-primary")} />
           {t("nav.home")}
         </Link>
+        <button
+          type="button"
+          onClick={() => setSearchOpen(true)}
+          className="flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
+        >
+          <Search className="size-4" />
+          {t("nav.search")}
+          <kbd className="ml-auto rounded border border-border bg-muted px-1 py-px font-sans text-[10px] text-muted-foreground/70">
+            {navigator.platform.includes("Mac") ? "\u2318K" : "Ctrl K"}
+          </kbd>
+        </button>
       </nav>
 
       {/* projects */}
@@ -358,7 +398,7 @@ export function Sidebar() {
           className={cn(
             "flex flex-1 items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
             onSettings
-              ? "bg-sidebar-accent font-semibold"
+              ? "bg-sidebar-accent"
               : "text-muted-foreground hover:bg-sidebar-accent/60",
           )}
         >
@@ -403,6 +443,7 @@ export function Sidebar() {
         title={t("nav.resizeHint")}
         className="absolute right-0 top-0 z-10 h-full w-1 cursor-col-resize transition-colors hover:bg-primary/40"
       />
+      <SearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
     </aside>
   );
 }
@@ -443,9 +484,9 @@ function ProjectRow({
           next to it rather than nested inside another clickable element. */}
       <div
         className={cn(
-          "group flex items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors",
+          "group flex items-center gap-2 rounded-lg px-3 py-1.5 text-left text-sm transition-colors",
           active
-            ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
+            ? "bg-sidebar-accent text-sidebar-accent-foreground"
             : "text-muted-foreground hover:bg-sidebar-accent/60",
         )}
       >
@@ -455,12 +496,12 @@ function ProjectRow({
           title={project.path}
           aria-label={t("sidebar.openProject", { name: project.name })}
           aria-current={active ? "page" : undefined}
-          className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {active ? (
-            <FolderOpen className="size-3.5 shrink-0 text-primary" />
+            <FolderOpen className="size-4 shrink-0 text-muted-foreground" />
           ) : (
-            <Folder className="size-3.5 shrink-0" />
+            <Folder className="size-4 shrink-0" />
           )}
           <span className="min-w-0 flex-1 truncate">{project.name}</span>
         </button>
@@ -498,18 +539,7 @@ function ProjectRow({
       </div>
 
       {open && (
-        <div className="my-0.5 ml-3.5 border-l border-sidebar-border pl-1.5">
-          <Link
-            to="/p/$projectId/chat"
-            params={{ projectId: project.id }}
-            className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px] text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
-            activeProps={{
-              className: "bg-sidebar-accent font-semibold text-sidebar-accent-foreground",
-            }}
-          >
-            <MessageSquare className="size-3" />
-            <span className="min-w-0 flex-1 truncate">{t("chat.title")}</span>
-          </Link>
+        <div className="mb-1 mt-0.5 ml-[1.35rem] flex flex-col gap-0.5 border-l border-sidebar-border pl-2">
           {isPending && (
             <p className="px-2 py-1 text-[12px] text-muted-foreground/60">
               {t("sidebar.scanning")}
@@ -531,7 +561,53 @@ function ProjectRow({
                 items={itemsOfKind(scan.items, section.kind)}
               />
             ))}
+          <ConversationsSection t={t} projectId={project.id} />
         </div>
+      )}
+    </div>
+  );
+}
+
+/** The project's saved chats, listed like a capability section. */
+function ConversationsSection({ t, projectId }: { t: TFunc; projectId: string }) {
+  const { data: sessions = [] } = useChatSessions(projectId);
+  return (
+    <div className="group/section py-0.5">
+      <div className="flex items-center gap-2 px-2 py-1 text-[13px] text-muted-foreground">
+        <MessageSquare className="size-3.5" />
+        <span className="truncate">{t("sidebar.conversations")}</span>
+        <span className="text-[11px] text-muted-foreground/50">{sessions.length}</span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Link
+              to="/p/$projectId/chat"
+              params={{ projectId }}
+              aria-label={t("chat.newChat")}
+              className="ml-auto rounded p-0.5 opacity-0 transition-opacity hover:bg-sidebar-accent hover:text-foreground focus-visible:opacity-100 group-hover/section:opacity-100"
+            >
+              <Plus className="size-3.5" />
+            </Link>
+          </TooltipTrigger>
+          <TooltipContent side="right">{t("chat.newChat")}</TooltipContent>
+        </Tooltip>
+      </div>
+      {sessions.length === 0 ? (
+        <p className="px-2 pb-0.5 pl-4 text-[12px] text-muted-foreground/50">
+          {t("sidebar.sectionEmpty")}
+        </p>
+      ) : (
+        sessions.map((session) => (
+          <Link
+            key={session.id}
+            to="/p/$projectId/chat/$sessionId"
+            params={{ projectId, sessionId: session.id }}
+            title={session.title || t("chat.untitled")}
+            className="flex items-center gap-1.5 rounded-md py-1 pl-4 pr-2 text-[12px] text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
+            activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
+          >
+            <span className="min-w-0 flex-1 truncate">{session.title || t("chat.untitled")}</span>
+          </Link>
+        ))
       )}
     </div>
   );
@@ -554,10 +630,10 @@ function CapabilitySection({
   const Icon = KIND_ICONS[kind];
   return (
     <div className="group/section py-0.5">
-      <div className="flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
-        <Icon className="size-3" />
+      <div className="flex items-center gap-2 px-2 py-1 text-[13px] text-muted-foreground">
+        <Icon className="size-3.5" />
         <span className="truncate">{label}</span>
-        <span className="text-muted-foreground/40">{items.length}</span>
+        <span className="text-[11px] text-muted-foreground/50">{items.length}</span>
         <Tooltip>
           <TooltipTrigger asChild>
             <Link
@@ -566,7 +642,7 @@ function CapabilitySection({
               aria-label={t(`new.title.${kind}`)}
               className="ml-auto rounded p-0.5 opacity-0 transition-opacity hover:bg-sidebar-accent hover:text-foreground focus-visible:opacity-100 group-hover/section:opacity-100"
             >
-              <Plus className="size-3" />
+              <Plus className="size-3.5" />
             </Link>
           </TooltipTrigger>
           <TooltipContent side="right">{t(`new.title.${kind}`)}</TooltipContent>
@@ -577,21 +653,26 @@ function CapabilitySection({
           {t("sidebar.sectionEmpty")}
         </p>
       ) : (
-        items.map((item) => (
-          <Link
-            key={item.id}
-            to="/p/$projectId/item/$itemId"
-            params={{ projectId, itemId: item.id }}
-            title={item.sourceFile}
-            className="flex items-center gap-1.5 rounded-md py-1 pl-4 pr-2 text-[12px] text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
-            activeProps={{
-              className: "bg-sidebar-accent font-semibold text-sidebar-accent-foreground",
-            }}
-          >
-            <span className="min-w-0 flex-1 truncate">{item.name}</span>
-            <CapabilityBadges item={item} size="sm" />
-          </Link>
-        ))
+        items.map((item) => {
+          const broken = item.parseError != null;
+          return (
+            <Link
+              key={item.id}
+              to="/p/$projectId/item/$itemId"
+              params={{ projectId, itemId: item.id }}
+              title={broken ? (item.parseError ?? undefined) : item.sourceFile}
+              className={cn(
+                "flex items-center gap-1.5 rounded-md py-1 pl-4 pr-2 text-[12px] transition-colors hover:bg-sidebar-accent/60",
+                broken ? "text-destructive" : "text-muted-foreground",
+              )}
+              activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
+            >
+              <ScopeIcon scope={item.scope} className={cn(broken && "text-destructive")} />
+              <span className="min-w-0 flex-1 truncate">{item.name}</span>
+              <EcosystemBadge ecosystem={item.ecosystem} size="sm" />
+            </Link>
+          );
+        })
       )}
     </div>
   );

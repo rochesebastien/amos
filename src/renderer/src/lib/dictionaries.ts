@@ -28,6 +28,7 @@ export const dict: Record<Lang, Record<string, string>> = {
 
     // nav
     "nav.home": "Home",
+    "nav.search": "Search",
     "nav.main": "Main navigation",
     "nav.settings": "Settings",
     "nav.toggleTheme": "Toggle theme",
@@ -36,6 +37,15 @@ export const dict: Record<Lang, Record<string, string>> = {
     "nav.resizeHint": "Drag to resize · double-click to collapse",
 
     // sidebar
+    "search.title": "Search",
+    "search.placeholder": "Search projects, agents, skills, MCP servers, conversations…",
+    "search.start": "Type to search across your projects.",
+    "search.empty": "No results for “{query}”",
+    "search.chats": "Conversations",
+    "search.hintNavigate": "navigate",
+    "search.hintOpen": "open",
+    "search.hintClose": "close",
+
     "sidebar.label": "Sidebar",
     "sidebar.projects": "Projects",
     "sidebar.none": "No project yet",
@@ -48,9 +58,16 @@ export const dict: Record<Lang, Record<string, string>> = {
     "sidebar.collapseProject": "Hide capabilities",
     "sidebar.scanning": "Scanning…",
     "sidebar.sectionEmpty": "None",
+    "sidebar.conversations": "Conversations",
+    "terminal.open": "Open a terminal",
+    "terminal.new": "New terminal",
+    "terminal.shell": "Shell",
+    "terminal.hide": "Hide terminals",
+    "terminal.closeTab": "Close terminal",
+    "terminal.failed": "This terminal could not start.",
 
     // welcome / recents
-    "welcome.title": "Welcome to AMOS",
+    "welcome.title": "Agentic Management and Orchestrator Software",
     "welcome.subtitle":
       "Open a project folder to manage its agents, skills and MCP servers — for Claude and Codex alike.",
     "welcome.openFolder": "Open folder",
@@ -337,12 +354,22 @@ export const dict: Record<Lang, Record<string, string>> = {
     "common.areYouSure": "Êtes-vous sûr ?",
 
     "nav.home": "Accueil",
+    "nav.search": "Recherche",
     "nav.main": "Navigation principale",
     "nav.settings": "Paramètres",
     "nav.toggleTheme": "Changer de thème",
     "nav.expandSidebar": "Déplier le panneau",
     "nav.collapseSidebar": "Replier le panneau",
     "nav.resizeHint": "Glisser pour redimensionner · double-clic pour replier",
+
+    "search.title": "Recherche",
+    "search.placeholder": "Rechercher projets, agents, skills, serveurs MCP, conversations…",
+    "search.start": "Tapez pour chercher dans vos projets.",
+    "search.empty": "Aucun résultat pour « {query} »",
+    "search.chats": "Conversations",
+    "search.hintNavigate": "naviguer",
+    "search.hintOpen": "ouvrir",
+    "search.hintClose": "fermer",
 
     "sidebar.label": "Panneau latéral",
     "sidebar.projects": "Projets",
@@ -356,8 +383,15 @@ export const dict: Record<Lang, Record<string, string>> = {
     "sidebar.collapseProject": "Masquer les capacités",
     "sidebar.scanning": "Analyse…",
     "sidebar.sectionEmpty": "Aucun",
+    "sidebar.conversations": "Conversations",
+    "terminal.open": "Ouvrir un terminal",
+    "terminal.new": "Nouveau terminal",
+    "terminal.shell": "Shell",
+    "terminal.hide": "Masquer les terminaux",
+    "terminal.closeTab": "Fermer le terminal",
+    "terminal.failed": "Ce terminal n\u2019a pas pu démarrer.",
 
-    "welcome.title": "Bienvenue dans AMOS",
+    "welcome.title": "Agentic Management and Orchestrator Software",
     "welcome.subtitle":
       "Ouvrez un dossier de projet pour gérer ses agents, skills et serveurs MCP — côté Claude comme côté Codex.",
     "welcome.openFolder": "Ouvrir un dossier",

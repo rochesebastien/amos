@@ -1,5 +1,6 @@
 import { Link, useParams } from "@tanstack/react-router";
-import { ArrowLeft, FileCode, FileText } from "lucide-react";
+import { ViewHeader } from "@/components/ViewHeader";
+import { FileText } from "lucide-react";
 import { useProjectScan } from "@/lib/queries";
 import { useT } from "@/lib/i18n";
 import { EcosystemBadge, ScopeBadge } from "@/components/CapabilityBadges";
@@ -47,36 +48,33 @@ export function InstructionView() {
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
-      <header className="px-8 pt-8 pb-4">
-        <Link
-          to="/p/$projectId"
-          params={{ projectId }}
-          className="mb-3 inline-flex items-center gap-1.5 text-[13px] text-muted-foreground/70 transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="size-3.5" />
-          {t("cap.backToProject")}
-        </Link>
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="flex min-w-0 items-center gap-3 text-3xl font-display">
-            <FileText className="size-7 shrink-0 text-primary" />
-            <span className="truncate">{file.relativePath}</span>
-          </h1>
-          <EcosystemBadge ecosystem={file.ecosystem} />
-          <ScopeBadge scope={file.scope} />
-          <span className="text-xs text-muted-foreground/60">{formatBytes(file.bytes)}</span>
-        </div>
-        <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground/70">
-          <FileCode className="size-3.5 shrink-0" />
-          <span className="truncate font-mono text-[13px]" title={file.path}>
-            {file.path}
-          </span>
-        </p>
-        <p className="mt-1 text-[13px] text-muted-foreground/70">
+      <ViewHeader
+        backTo="/p/$projectId"
+        backParams={{ projectId }}
+        backLabel={t("cap.backToProject")}
+        icon={<FileText className="size-4" />}
+        title={file.relativePath}
+        meta={
+          <>
+            <EcosystemBadge ecosystem={file.ecosystem} size="sm" />
+            <ScopeBadge scope={file.scope} size="sm" />
+            <span className="shrink-0 text-xs text-muted-foreground/60">
+              {formatBytes(file.bytes)}
+            </span>
+            <span
+              className="hidden truncate font-mono text-[12px] text-muted-foreground/60 lg:block"
+              title={file.path}
+            >
+              {file.path}
+            </span>
+          </>
+        }
+      />
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-8 py-4">
+        <p className="mb-3 text-[13px] text-muted-foreground/70">
           {t(`instructions.read.${file.ecosystem}`)}
         </p>
-      </header>
-
-      <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-4">
         <InstructionEditor projectId={projectId} file={file} />
       </div>
     </div>

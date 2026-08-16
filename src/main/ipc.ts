@@ -7,7 +7,6 @@ import type {
   IpcResponse,
   PingResult,
   SaveCapabilityResult,
-  ScanChangedEvent,
 } from "../shared/ipc.js";
 import { MCP_TRANSPORTS } from "../shared/capabilities.js";
 import {
@@ -16,7 +15,6 @@ import {
   CLI_VENDORS,
   ECHO_DRIVER_ENV,
   ECHO_DRIVER_SETTING,
-  type ChatEventMessage,
   type CliDetection,
   type CliVendor,
 } from "../shared/chat.js";
@@ -42,6 +40,7 @@ import {
   markAuthSuccess,
 } from "./chat/detect.js";
 import { ChatManager, createDriverFactory, createDriverKey } from "./chat/manager.js";
+import { TerminalManager } from "./terminal/manager.js";
 import { scanProject } from "./scanner/index.js";
 import { writeAgent, writeMcp, writeSkillMd } from "./scanner/writers.js";
 import { WatchManager } from "./scanner/watch.js";
@@ -113,6 +112,20 @@ const SaveMcpRequest = z.object({
 });
 
 const DetectRequest = z.object({ refresh: z.boolean().optional() }).optional();
+const TerminalId = z.object({ id: z.string().min(1).max(200) });
+const TerminalCreateRequest = z.object({
+  projectId: z.string().min(1),
+  kind: z.enum(["claude", "codex", "shell"]),
+  cols: z.number().int().min(1).max(1000),
+  rows: z.number().int().min(1).max(1000),
+});
+const TerminalWriteRequest = z.object({ id: z.string().min(1).max(200), data: z.string().max(100_000) });
+const TerminalResizeRequest = z.object({
+  id: z.string().min(1).max(200),
+  cols: z.number().int().min(1).max(1000),
+  rows: z.number().int().min(1).max(1000),
+});
+const TerminalKillRequest = TerminalId;
 const ChatSessionId = z.object({ sessionId: z.string().min(1).max(200) });
 const ChatSendRequest = z.object({
   projectId: z.string().min(1),
@@ -151,16 +164,10 @@ async function allowPath(requested: string): Promise<string> {
 
 let watchManager: WatchManager | null = null;
 let chatManager: ChatManager | null = null;
+let terminalManager: TerminalManager | null = null;
 
 /** Push a payload to every open window. */
-function broadcast<C extends "scan:changed" | "chat:event" | "cli:changed">(
-  channel: C,
-  payload: C extends "scan:changed"
-    ? ScanChangedEvent
-    : C extends "chat:event"
-      ? ChatEventMessage
-      : CliDetection,
-): void {
+function broadcast(channel: string, payload: unknown): void {
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) win.webContents.send(channel, payload);
   }
@@ -210,6 +217,13 @@ export function registerIpcHandlers(): void {
       markAuthSuccess(vendor);
       void refreshDetection();
     },
+  });
+
+  terminalManager = new TerminalManager({
+    emitData: (event) => broadcast("terminal:data", event),
+    emitExit: (event) => broadcast("terminal:exit", event),
+    resolveProjectPath: (projectId) => getProject(projectId)?.path ?? null,
+    resolveBinary: (kind) => cachedDetection()?.clis[kind]?.path ?? null,
   });
 
   // Repair the PATH of a GUI-launched app before anything asks for a binary.
@@ -355,6 +369,23 @@ export function registerIpcHandlers(): void {
     return deleteSession(input.sessionId);
   });
 
+  handle("terminal:create", TerminalCreateRequest, (input) => {
+    if (!terminalManager) throw new Error("Terminals are not available.");
+    return terminalManager.create(input);
+  });
+  handle("terminal:write", TerminalWriteRequest, (input) => {
+    terminalManager?.write(input.id, input.data);
+    return { ok: true } as const;
+  });
+  handle("terminal:resize", TerminalResizeRequest, (input) => {
+    terminalManager?.resize(input.id, input.cols, input.rows);
+    return { ok: true } as const;
+  });
+  handle("terminal:kill", TerminalKillRequest, (input) => {
+    terminalManager?.kill(input.id);
+    return { ok: true } as const;
+  });
+
   handle("settings:get", SettingKey, (input) => getSetting(input.key));
   handle("settings:set", SettingEntry, async (input) => {
     const result = setSetting(input.key, input.value);
@@ -372,7 +403,10 @@ export function registerIpcHandlers(): void {
 export async function disposeIpcHandlers(): Promise<void> {
   const watchers = watchManager;
   const chat = chatManager;
+  const terminals = terminalManager;
   watchManager = null;
   chatManager = null;
+  terminalManager = null;
+  terminals?.dispose();
   await Promise.all([watchers?.closeAll(), chat?.dispose()]);
 }

@@ -42,7 +42,7 @@ export function SettingsLayout() {
                 className={cn(
                   "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
                   active
-                    ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
                     : "text-muted-foreground hover:bg-sidebar-accent/60",
                 )}
               >
