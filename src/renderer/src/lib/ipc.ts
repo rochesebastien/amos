@@ -72,6 +72,9 @@ export const ipc = {
   onScanChanged: (listener: (event: ScanChangedEvent) => void) =>
     bridge().scan.onChanged(listener),
 
+  /** The project's git branch; `head` is null when it is not a repository. */
+  gitHead: (projectId: string) => bridge().git.head({ projectId }),
+
   readFile: (path: string) => bridge().fs.readFile({ path }),
   writeFile: (input: { path: string; content: string; expectedMtimeMs?: number | null }) =>
     bridge().fs.writeFile(input),

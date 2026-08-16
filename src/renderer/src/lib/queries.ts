@@ -1,6 +1,14 @@
 // TanStack Query client, query keys, and typed hooks over the IPC bridge.
-import { QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  QueryClient,
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import type { SaveAgentRequest, SaveMcpRequest } from "@shared/ipc";
+import type { ChatSession } from "@shared/chat";
+import type { Project } from "@shared/ipc";
 import { ipc } from "./ipc";
 
 export const queryClient = new QueryClient({
@@ -16,6 +24,7 @@ export const queryClient = new QueryClient({
 export const qk = {
   projects: ["projects"] as const,
   scan: (projectId: string) => ["scan", projectId] as const,
+  gitHead: (projectId: string) => ["git", "head", projectId] as const,
   setting: (key: string) => ["setting", key] as const,
   file: (path: string) => ["file", path] as const,
   dir: (path: string) => ["dir", path] as const,
@@ -172,6 +181,58 @@ export function useChatSessions(projectId: string | null | undefined) {
     queryFn: () => ipc.listChatSessions(projectId!),
     enabled: Boolean(projectId),
     staleTime: 2_000,
+  });
+}
+
+/**
+ * The project's git branch. Cheap (two syscalls, no child process) but not
+ * free, and a branch changes under the app's feet — hence a short staleness
+ * window rather than a watch.
+ */
+export function useGitHead(projectId: string | null | undefined) {
+  return useQuery({
+    queryKey: qk.gitHead(projectId ?? ""),
+    queryFn: () => ipc.gitHead(projectId!),
+    enabled: Boolean(projectId),
+    staleTime: 5_000,
+    refetchOnWindowFocus: true,
+  });
+}
+
+/** A conversation carrying the project it belongs to, for cross-project lists. */
+export type ChatSessionWithProject = ChatSession & { projectName: string; projectPath: string };
+
+/**
+ * Every conversation of every project, newest first.
+ *
+ * One query per project rather than a new IPC call: these are the same query
+ * keys the sidebar and the palette already use, so a project the user just
+ * looked at costs nothing here, and a chat renamed anywhere invalidates one
+ * key and updates every list at once.
+ */
+export function useAllChatSessions(projects: Project[]) {
+  return useQueries({
+    queries: projects.map((project) => ({
+      queryKey: qk.chatSessions(project.id),
+      queryFn: () => ipc.listChatSessions(project.id),
+      staleTime: 2_000,
+    })),
+    combine: (results) => ({
+      isPending: results.some((r) => r.isPending),
+      sessions: results
+        .flatMap((result, i) => {
+          const project = projects[i];
+          if (!project || !result.data) return [];
+          return result.data.map(
+            (session): ChatSessionWithProject => ({
+              ...session,
+              projectName: project.name,
+              projectPath: project.path,
+            }),
+          );
+        })
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+    }),
   });
 }
 

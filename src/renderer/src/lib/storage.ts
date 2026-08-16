@@ -12,6 +12,8 @@ export const STORAGE_KEYS = {
   theme: `${PREFIX}theme`,
   sidebarWidth: `${PREFIX}sidebar.width`,
   sidebarCollapsed: `${PREFIX}sidebar.collapsed`,
+  sidebarView: `${PREFIX}sidebar.view`,
   projectsSort: `${PREFIX}projects.sort`,
   projectsExpanded: `${PREFIX}projects.expanded`,
+  terminalWidth: `${PREFIX}terminal.width`,
 } as const;

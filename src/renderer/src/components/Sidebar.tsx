@@ -12,17 +12,20 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   ArrowDownUp,
+  Boxes,
   Check,
   ChevronRight,
   MessageSquare,
   Plus,
 } from "lucide-react";
 import { itemsOfKind, type CapabilityKind } from "@shared/capabilities";
+import type { ChatBackend } from "@shared/chat";
 import { useApp } from "@/lib/store";
 import { useT, type TFunc } from "@/lib/i18n";
 import { useChatSessions, useProjectMutations, useProjects, useProjectScan } from "@/lib/queries";
 import { ipc, type Project } from "@/lib/ipc";
-import { useSidebar, type ProjectSort, SIDEBAR_RAIL } from "@/lib/sidebar";
+import { useSidebar, type ProjectSort, type SidebarView, SIDEBAR_RAIL } from "@/lib/sidebar";
+import { EcosystemGlyph } from "@/components/BrandIcons";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useConfirm } from "@/components/ui/confirm";
 import { EcosystemBadge, KIND_ICONS, ScopeIcon } from "@/components/CapabilityBadges";
@@ -42,7 +45,8 @@ export function Sidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const confirm = useConfirm();
 
-  const { width, collapsed, sort, setWidth, setCollapsed, toggle, setSort } = useSidebar();
+  const { width, collapsed, view, sort, setWidth, setCollapsed, toggle, setView, setSort } =
+    useSidebar();
   const { data: projects = [] } = useProjects();
   const { add, remove, touch } = useProjectMutations();
   const [sortOpen, setSortOpen] = useState(false);
@@ -62,6 +66,7 @@ export function Sidebar() {
 
   const activeProjectId = pathname.startsWith("/p/") ? (pathname.split("/")[2] ?? null) : null;
   const onHome = pathname === "/";
+  const onChats = pathname === "/chats";
   const onSettings = pathname.startsWith("/settings");
 
   const sorted = useMemo(() => {
@@ -148,6 +153,23 @@ export function Sidebar() {
             </Link>
           </TooltipTrigger>
           <TooltipContent side="right">{t("nav.home")}</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Link
+              to="/chats"
+              aria-label={t("nav.conversations")}
+              className={cn(
+                "flex size-9 items-center justify-center rounded-lg transition-colors",
+                onChats
+                  ? "bg-sidebar-accent text-primary"
+                  : "text-muted-foreground hover:bg-sidebar-accent/60",
+              )}
+            >
+              <MessageSquare className="size-4" />
+            </Link>
+          </TooltipTrigger>
+          <TooltipContent side="right">{t("nav.conversations")}</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -282,6 +304,18 @@ export function Sidebar() {
           <Home className={cn("size-4", onHome && "text-primary")} />
           {t("nav.home")}
         </Link>
+        <Link
+          to="/chats"
+          className={cn(
+            "flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors",
+            onChats
+              ? "bg-sidebar-accent text-sidebar-accent-foreground"
+              : "text-muted-foreground hover:bg-sidebar-accent/60",
+          )}
+        >
+          <MessageSquare className={cn("size-4", onChats && "text-primary")} />
+          {t("nav.conversations")}
+        </Link>
         <button
           type="button"
           onClick={() => setSearchOpen(true)}
@@ -294,6 +328,8 @@ export function Sidebar() {
           </kbd>
         </button>
       </nav>
+
+      <ViewTabs t={t} view={view} onChange={setView} />
 
       {/* projects */}
       <nav aria-label={t("sidebar.projects")} className="min-h-0 flex-1 overflow-y-auto px-2 pt-2 pb-2">
@@ -383,6 +419,7 @@ export function Sidebar() {
             <ProjectRow
               key={p.id}
               project={p}
+              view={view}
               active={activeProjectId === p.id}
               onOpen={() => void openProject(p)}
               onRemove={(e) => void removeProject(e, p)}
@@ -456,17 +493,74 @@ const SECTIONS: { kind: CapabilityKind; labelKey: string }[] = [
 ];
 
 /**
+ * Every row under an unfolded project — section titles and their items alike —
+ * indents by this much, so the icon column is one straight line down the tree
+ * rather than a staircase of near-misses.
+ */
+const TREE_INDENT = "pl-1.5";
+
+/** The two things the tree can show, as a segmented control above the list. */
+function ViewTabs({
+  t,
+  view,
+  onChange,
+}: {
+  t: TFunc;
+  view: SidebarView;
+  onChange: (v: SidebarView) => void;
+}) {
+  const tabs: { key: SidebarView; label: string; Icon: typeof Home }[] = [
+    { key: "chats", label: t("sidebar.viewChats"), Icon: MessageSquare },
+    { key: "agentic", label: t("sidebar.viewAgentic"), Icon: Boxes },
+  ];
+  return (
+    <div className="px-3 pb-1 pt-1.5">
+      <div
+        role="tablist"
+        aria-label={t("sidebar.viewLabel")}
+        className="flex gap-0.5 rounded-lg bg-sidebar-accent/40 p-0.5"
+      >
+        {tabs.map(({ key, label, Icon }) => {
+          const selected = view === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              onClick={() => onChange(key)}
+              className={cn(
+                "flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1 text-[12px] transition-colors",
+                selected
+                  ? "bg-sidebar text-sidebar-accent-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Icon className={cn("size-3.5", selected && "text-primary")} />
+              {label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/**
  * One project in the sidebar: a clickable name leading to the overview, and —
- * at its right — a chevron unfolding the Agents / MCPs / Skills the scanner
- * found. The scan only runs once a project is actually unfolded.
+ * at its right — a chevron unfolding what the active tab asks for. The scan
+ * only runs once a project is unfolded *and* the Agentic tab is the one on
+ * screen; the Chats tab costs nothing but the session list.
  */
 function ProjectRow({
   project,
+  view,
   active,
   onOpen,
   onRemove,
 }: {
   project: Project;
+  view: SidebarView;
   active: boolean;
   onOpen: () => void;
   onRemove: (e: React.MouseEvent) => void;
@@ -475,7 +569,8 @@ function ProjectRow({
   const expandedIds = useSidebar((s) => s.expanded);
   const toggleExpanded = useSidebar((s) => s.toggleExpanded);
   const open = expandedIds.includes(project.id);
-  const { data: scan, isPending, isError, error } = useProjectScan(project.id, open);
+  const agentic = view === "agentic";
+  const { data: scan, isPending, isError, error } = useProjectScan(project.id, open && agentic);
 
   return (
     <div>
@@ -540,17 +635,19 @@ function ProjectRow({
 
       {open && (
         <div className="mb-1 mt-0.5 ml-[1.35rem] flex flex-col gap-0.5 border-l border-sidebar-border pl-2">
-          {isPending && (
-            <p className="px-2 py-1 text-[12px] text-muted-foreground/60">
+          {!agentic && <ConversationsSection t={t} projectId={project.id} />}
+          {agentic && isPending && (
+            <p className="px-1.5 py-1 text-[12px] text-muted-foreground/60">
               {t("sidebar.scanning")}
             </p>
           )}
-          {isError && (
-            <p className="px-2 py-1 text-[12px] text-destructive">
+          {agentic && isError && (
+            <p className="px-1.5 py-1 text-[12px] text-destructive">
               {t("project.scanFailed", { error: (error as Error).message })}
             </p>
           )}
-          {scan &&
+          {agentic &&
+            scan &&
             SECTIONS.map((section) => (
               <CapabilitySection
                 key={section.kind}
@@ -561,11 +658,29 @@ function ProjectRow({
                 items={itemsOfKind(scan.items, section.kind)}
               />
             ))}
-          <ConversationsSection t={t} projectId={project.id} />
         </div>
       )}
     </div>
   );
+}
+
+/**
+ * A fixed icon slot. Section titles and their rows both put their icon in one
+ * of these, which is what keeps the column straight even though the glyphs
+ * inside are drawn at different sizes.
+ */
+function TreeIcon({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="flex size-3.5 shrink-0 items-center justify-center">{children}</span>
+  );
+}
+
+/** The mark of the CLI a conversation runs on; `echo` has no brand to show. */
+export function BackendGlyph({ backend }: { backend: ChatBackend }) {
+  if (backend !== "claude" && backend !== "codex") {
+    return <MessageSquare className="size-3 text-muted-foreground/70" />;
+  }
+  return <EcosystemGlyph ecosystem={backend} className="size-3 text-foreground/70" />;
 }
 
 /** The project's saved chats, listed like a capability section. */
@@ -573,8 +688,15 @@ function ConversationsSection({ t, projectId }: { t: TFunc; projectId: string })
   const { data: sessions = [] } = useChatSessions(projectId);
   return (
     <div className="group/section py-0.5">
-      <div className="flex items-center gap-2 px-2 py-1 text-[13px] text-muted-foreground">
-        <MessageSquare className="size-3.5" />
+      <div
+        className={cn(
+          "flex items-center gap-2 py-1 pr-2 text-[13px] text-muted-foreground",
+          TREE_INDENT,
+        )}
+      >
+        <TreeIcon>
+          <MessageSquare className="size-3.5" />
+        </TreeIcon>
         <span className="truncate">{t("sidebar.conversations")}</span>
         <span className="text-[11px] text-muted-foreground/50">{sessions.length}</span>
         <Tooltip>
@@ -592,7 +714,7 @@ function ConversationsSection({ t, projectId }: { t: TFunc; projectId: string })
         </Tooltip>
       </div>
       {sessions.length === 0 ? (
-        <p className="px-2 pb-0.5 pl-4 text-[12px] text-muted-foreground/50">
+        <p className={cn("pb-0.5 pr-2 text-[12px] text-muted-foreground/50", TREE_INDENT)}>
           {t("sidebar.sectionEmpty")}
         </p>
       ) : (
@@ -602,9 +724,15 @@ function ConversationsSection({ t, projectId }: { t: TFunc; projectId: string })
             to="/p/$projectId/chat/$sessionId"
             params={{ projectId, sessionId: session.id }}
             title={session.title || t("chat.untitled")}
-            className="flex items-center gap-1.5 rounded-md py-1 pl-4 pr-2 text-[12px] text-muted-foreground transition-colors hover:bg-sidebar-accent/60"
+            className={cn(
+              "flex items-center gap-2 rounded-md py-1 pr-2 text-[12px] text-muted-foreground transition-colors hover:bg-sidebar-accent/60",
+              TREE_INDENT,
+            )}
             activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
           >
+            <TreeIcon>
+              <BackendGlyph backend={session.backend} />
+            </TreeIcon>
             <span className="min-w-0 flex-1 truncate">{session.title || t("chat.untitled")}</span>
           </Link>
         ))
@@ -630,8 +758,15 @@ function CapabilitySection({
   const Icon = KIND_ICONS[kind];
   return (
     <div className="group/section py-0.5">
-      <div className="flex items-center gap-2 px-2 py-1 text-[13px] text-muted-foreground">
-        <Icon className="size-3.5" />
+      <div
+        className={cn(
+          "flex items-center gap-2 py-1 pr-2 text-[13px] text-muted-foreground",
+          TREE_INDENT,
+        )}
+      >
+        <TreeIcon>
+          <Icon className="size-3.5" />
+        </TreeIcon>
         <span className="truncate">{label}</span>
         <span className="text-[11px] text-muted-foreground/50">{items.length}</span>
         <Tooltip>
@@ -649,7 +784,7 @@ function CapabilitySection({
         </Tooltip>
       </div>
       {items.length === 0 ? (
-        <p className="px-2 pb-0.5 pl-4 text-[12px] text-muted-foreground/50">
+        <p className={cn("pb-0.5 pr-2 text-[12px] text-muted-foreground/50", TREE_INDENT)}>
           {t("sidebar.sectionEmpty")}
         </p>
       ) : (
@@ -662,12 +797,15 @@ function CapabilitySection({
               params={{ projectId, itemId: item.id }}
               title={broken ? (item.parseError ?? undefined) : item.sourceFile}
               className={cn(
-                "flex items-center gap-1.5 rounded-md py-1 pl-4 pr-2 text-[12px] transition-colors hover:bg-sidebar-accent/60",
+                "flex items-center gap-2 rounded-md py-1 pr-2 text-[12px] transition-colors hover:bg-sidebar-accent/60",
+                TREE_INDENT,
                 broken ? "text-destructive" : "text-muted-foreground",
               )}
               activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
             >
-              <ScopeIcon scope={item.scope} className={cn(broken && "text-destructive")} />
+              <TreeIcon>
+                <ScopeIcon scope={item.scope} className={cn(broken && "text-destructive")} />
+              </TreeIcon>
               <span className="min-w-0 flex-1 truncate">{item.name}</span>
               <EcosystemBadge ecosystem={item.ecosystem} size="sm" />
             </Link>

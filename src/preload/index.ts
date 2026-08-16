@@ -50,6 +50,9 @@ const amos: AmosApi = {
     unwatch: (input) => invoke("scan:unwatch", input),
     onChanged: (listener) => subscribe("scan:changed", listener),
   },
+  git: {
+    head: (input) => invoke("git:head", input),
+  },
   fs: {
     readFile: (input) => invoke("fs:readFile", input),
     writeFile: (input) => invoke("fs:writeFile", input),

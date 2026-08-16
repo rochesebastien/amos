@@ -6,11 +6,14 @@ import {
   Check,
   ChevronDown,
   Copy,
+  Folder,
+  GitBranch,
   MessageSquarePlus,
   Square,
   Trash2,
   Wrench,
 } from "lucide-react";
+import type { GitHead } from "@shared/ipc";
 import {
   CHAT_BACKENDS,
   CHAT_BACKEND_SETTING,
@@ -23,6 +26,7 @@ import {
   useChatSessions,
   useCliDetection,
   useDeleteChatSession,
+  useGitHead,
   useProjects,
   useSetting,
   useSettingMutation,
@@ -115,6 +119,7 @@ export function ChatView() {
   const clearStream = useChatStreams((state) => state.clear);
   const deleteSession = useDeleteChatSession(projectId);
 
+  const { data: git } = useGitHead(projectId);
   const { data: storedBackend } = useSetting(CHAT_BACKEND_SETTING);
   const saveSetting = useSettingMutation();
   const [pickedBackend, setPickedBackend] = useState<ChatBackend | null>(null);
@@ -317,6 +322,13 @@ export function ChatView() {
             </p>
           )}
 
+          <ComposerContext
+            t={t}
+            projectName={project?.name ?? null}
+            projectPath={project?.path ?? null}
+            head={git?.head ?? null}
+          />
+
           <div className="flex items-end gap-2 rounded-xl border border-input bg-card p-2 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30">
             <textarea
               ref={textareaRef}
@@ -372,6 +384,51 @@ export function ChatView() {
           </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * What the next turn will actually run against: which folder, and which branch
+ * that folder is on. The CLI inherits the project directory as its working
+ * directory, so "which branch am I about to change" is a property of the
+ * prompt, not a detail buried in the project view — it belongs next to the
+ * composer, beside the backend picker that answers "which CLI".
+ *
+ * Renders nothing outside a git working tree: most folders are not one, and an
+ * empty chip would be noise.
+ */
+function ComposerContext({
+  t,
+  projectName,
+  projectPath,
+  head,
+}: {
+  t: TFunc;
+  projectName: string | null;
+  projectPath: string | null;
+  head: GitHead | null;
+}) {
+  if (!projectName) return null;
+  const branch = head?.branch ?? head?.detachedAt ?? null;
+  return (
+    <div className="mb-1.5 flex items-center gap-1.5 px-1">
+      <span
+        title={projectPath ?? undefined}
+        className="flex min-w-0 items-center gap-1.5 rounded-md border border-border bg-card px-2 py-0.5 text-[11px] text-muted-foreground"
+      >
+        <Folder className="size-3 shrink-0" />
+        <span className="truncate">{projectName}</span>
+      </span>
+      {branch && (
+        <span
+          title={head?.branch ? t("chat.onBranch", { branch }) : t("chat.detachedHead")}
+          className="flex min-w-0 items-center gap-1.5 rounded-md border border-border bg-card px-2 py-0.5 text-[11px] text-muted-foreground"
+        >
+          <GitBranch className="size-3 shrink-0" />
+          <span className="max-w-[16rem] truncate">{branch}</span>
+        </span>
+      )}
     </div>
   );
 }

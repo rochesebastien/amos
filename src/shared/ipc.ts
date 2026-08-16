@@ -38,6 +38,14 @@ export type Project = {
   lastOpenedAt: string | null;
 };
 
+/** Where a project's git `HEAD` points. */
+export type GitHead = {
+  /** Branch name, e.g. `main`. `null` when HEAD is detached. */
+  branch: string | null;
+  /** Short commit sha when detached, so the UI still has something to show. */
+  detachedAt: string | null;
+};
+
 export type PingResult = {
   pong: true;
   /** AMOS version, taken from package.json at build time. */
@@ -208,6 +216,12 @@ export type IpcInvokeMap = {
   /** Stop watching a project. Idempotent. */
   "scan:unwatch": { request: { projectId: string }; response: { ok: true } };
 
+  /**
+   * The git branch a project is on. `head` is `null` when the folder is not a
+   * working tree — not an error, most folders simply are not repositories.
+   */
+  "git:head": { request: { projectId: string }; response: { head: GitHead | null } };
+
   /** Read a UTF-8 file inside an allowed root. */
   "fs:readFile": { request: { path: string }; response: ReadFileResult };
   /** Atomically replace a UTF-8 file inside an allowed root. */
@@ -283,6 +297,7 @@ export const IPC_CHANNELS = [
   "scan:project",
   "scan:watch",
   "scan:unwatch",
+  "git:head",
   "fs:readFile",
   "fs:writeFile",
   "fs:listDir",
@@ -337,6 +352,9 @@ export type AmosApi = {
     unwatch(input: { projectId: string }): Promise<{ ok: true }>;
     /** Subscribe to debounced filesystem changes; returns an unsubscribe. */
     onChanged(listener: (event: ScanChangedEvent) => void): () => void;
+  };
+  git: {
+    head(input: { projectId: string }): Promise<{ head: GitHead | null }>;
   };
   fs: {
     readFile(input: { path: string }): Promise<ReadFileResult>;

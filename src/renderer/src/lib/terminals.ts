@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { TerminalKind } from "@shared/terminal";
+import { STORAGE_KEYS } from "./storage";
 
 /**
  * State of the terminals side panel: whether it is open, its tabs, and which
@@ -26,8 +27,23 @@ export type TerminalTab = {
   title: string;
 };
 
+/**
+ * Width bounds of the panel. The floor is not cosmetic: a TUI like Claude
+ * Code reflows badly under ~40 columns, and 320px is about where that starts.
+ */
+export const TERMINAL_MIN_WIDTH = 320;
+export const TERMINAL_MAX_WIDTH = 1100;
+export const TERMINAL_DEFAULT_WIDTH = 440;
+
+const WIDTH_KEY = STORAGE_KEYS.terminalWidth;
+
+function clampWidth(w: number) {
+  return Math.min(TERMINAL_MAX_WIDTH, Math.max(TERMINAL_MIN_WIDTH, Math.round(w)));
+}
+
 type TerminalState = {
   open: boolean;
+  width: number;
   tabs: TerminalTab[];
   activeKey: string | null;
   /** Open the panel and add a tab for this project + kind. */
@@ -35,6 +51,7 @@ type TerminalState = {
   closeTab: (key: string) => void;
   setActive: (key: string) => void;
   setOpen: (open: boolean) => void;
+  setWidth: (w: number) => void;
   bindTerminalId: (key: string, terminalId: string) => void;
   markExited: (terminalId: string) => void;
 };
@@ -48,8 +65,11 @@ const LABELS: Record<TerminalKind, string> = {
 let counter = 0;
 const nextKey = () => `term-${++counter}`;
 
+const storedWidth = Number(localStorage.getItem(WIDTH_KEY));
+
 export const useTerminals = create<TerminalState>((set) => ({
   open: false,
+  width: storedWidth ? clampWidth(storedWidth) : TERMINAL_DEFAULT_WIDTH,
   tabs: [],
   activeKey: null,
 
@@ -77,6 +97,12 @@ export const useTerminals = create<TerminalState>((set) => ({
 
   setActive: (key) => set({ activeKey: key }),
   setOpen: (open) => set({ open }),
+
+  setWidth: (w) => {
+    const width = clampWidth(w);
+    localStorage.setItem(WIDTH_KEY, String(width));
+    set({ width });
+  },
 
   bindTerminalId: (key, terminalId) =>
     set((s) => ({

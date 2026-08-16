@@ -13,6 +13,7 @@ import { ChatSync } from "@/components/ChatSync";
 import { TerminalPanel } from "@/components/TerminalPanel";
 import { SettingsLayout } from "@/views/settings/SettingsLayout";
 import { WelcomeView } from "@/views/WelcomeView";
+import { ConversationsView } from "@/views/ConversationsView";
 import { ProjectView } from "@/views/ProjectView";
 import { ItemView } from "@/views/ItemView";
 import { InstructionView } from "@/views/InstructionView";
@@ -46,6 +47,13 @@ const welcomeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
   component: WelcomeView,
+});
+
+/** Every conversation of every project, newest first. */
+const chatsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/chats",
+  component: ConversationsView,
 });
 
 /** Project overview. */
@@ -120,6 +128,7 @@ const backendsSettingsRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   welcomeRoute,
+  chatsRoute,
   projectRoute,
   chatRoute,
   chatSessionRoute,

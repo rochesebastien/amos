@@ -47,6 +47,7 @@ import { WatchManager } from "./scanner/watch.js";
 import { getSetting, setSetting } from "./services/settings.js";
 import { buildAllowedRoots, resolveAllowedPath } from "./services/paths.js";
 import { listDirectory, readTextFile } from "./services/files.js";
+import { readGitHead } from "./services/git.js";
 import { safeWriteFile } from "./services/safeWrite.js";
 
 /**
@@ -282,6 +283,14 @@ export function registerIpcHandlers(): void {
   handle("scan:unwatch", ScanRequest, async (input) => {
     await watchManager?.unwatch(input.projectId);
     return { ok: true } as const;
+  });
+
+  // Same rule as the scanner: the path comes from the database, never from the
+  // renderer, so there is nothing here for a caller to point somewhere else.
+  handle("git:head", ScanRequest, async (input) => {
+    const project = getProject(input.projectId);
+    if (!project) throw new Error(`Unknown project: ${input.projectId}`);
+    return { head: await readGitHead(project.path) };
   });
 
   // ----- filesystem ---------------------------------------------------------

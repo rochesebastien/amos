@@ -46,8 +46,18 @@ function readTheme() {
 export function TerminalPanel() {
   const t = useT();
   const theme = useApp((s) => s.theme);
-  const { open, tabs, activeKey, setActive, closeTab, setOpen, bindTerminalId, markExited } =
-    useTerminals();
+  const {
+    open,
+    width,
+    tabs,
+    activeKey,
+    setActive,
+    closeTab,
+    setOpen,
+    setWidth,
+    bindTerminalId,
+    markExited,
+  } = useTerminals();
 
   // One subscription for the whole panel; route to the active writers by id.
   const sinks = React.useRef(new Map<string, (data: string) => void>());
@@ -79,10 +89,40 @@ export function TerminalPanel() {
     return () => sinks.current.delete(id);
   }, []);
 
+  // Drag the left edge. Mirrors the sidebar's handle, but grows the panel as
+  // the pointer moves *left*, hence the inverted delta.
+  const onDragStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = width;
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "col-resize";
+    const onMove = (ev: MouseEvent) => setWidth(startW - (ev.clientX - startX));
+    const onUp = () => {
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
   if (!open || tabs.length === 0) return null;
 
   return (
-    <aside className="flex h-full w-[440px] max-w-[46vw] min-w-[320px] shrink-0 flex-col border-l border-border bg-card">
+    <aside
+      style={{ width }}
+      className="relative flex h-full max-w-[70vw] shrink-0 flex-col border-l border-border bg-card"
+    >
+      {/* Drag handle. Pointer-only on purpose, like the sidebar's: the panel
+          has a labelled close button, so nothing here is keyboard-only. */}
+      <div
+        aria-hidden
+        onMouseDown={onDragStart}
+        title={t("terminal.resizeHint")}
+        className="absolute left-0 top-0 z-10 h-full w-1 cursor-col-resize transition-colors hover:bg-primary/40"
+      />
       <div className="flex items-center gap-1 border-b border-border bg-background/40 pl-2 pr-1">
         <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto py-1.5">
           {tabs.map((tab) => (
@@ -212,7 +252,7 @@ function TerminalView({
   const idRef = React.useRef<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
-  // Spawn once, on mount.
+  // Mount xterm, then let layout decide when to spawn the child.
   React.useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
@@ -226,38 +266,85 @@ function TerminalView({
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(host);
-    fit.fit();
     xtermRef.current = term;
     fitRef.current = fit;
 
     let unregister = () => {};
     let disposed = false;
+    let spawned = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
-    void ipc
-      .createTerminal({ projectId: tab.projectId, kind: tab.kind, cols: term.cols, rows: term.rows })
-      .then((res) => {
-        if (disposed) {
-          void ipc.killTerminal(res.id);
-          return;
-        }
-        idRef.current = res.id;
-        onSpawned(res.id);
-        if (!res.pty) {
-          term.writeln("\x1b[90m[amos] no PTY backend — piped process, no TTY\x1b[0m");
-        }
-        unregister = registerSink(res.id, (data) => term.write(data));
-        term.onData((data) => {
-          if (idRef.current) void ipc.writeTerminal(idRef.current, data);
+    /** Fit to the host. `false` when the host has no size to fit to yet. */
+    const fitToHost = () => {
+      if (host.clientWidth < 1 || host.clientHeight < 1) return false;
+      try {
+        fit.fit();
+      } catch {
+        return false;
+      }
+      return true;
+    };
+
+    const spawn = () => {
+      spawned = true;
+      void ipc
+        .createTerminal({
+          projectId: tab.projectId,
+          kind: tab.kind,
+          cols: term.cols,
+          rows: term.rows,
+        })
+        .then((res) => {
+          if (disposed) {
+            void ipc.killTerminal(res.id);
+            return;
+          }
+          idRef.current = res.id;
+          onSpawned(res.id);
+          if (!res.pty) {
+            term.writeln("\x1b[90m[amos] no PTY backend — piped process, no TTY\x1b[0m");
+          }
+          unregister = registerSink(res.id, (data) => term.write(data));
+          term.onData((data) => {
+            if (idRef.current) void ipc.writeTerminal(idRef.current, data);
+          });
+        })
+        .catch((e: unknown) => {
+          const message = e instanceof Error ? e.message : String(e);
+          setError(message);
+          term.writeln(`\x1b[31m${message}\x1b[0m`);
         });
-      })
-      .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : String(e);
-        setError(message);
-        term.writeln(`\x1b[31m${message}\x1b[0m`);
-      });
+    };
+
+    /**
+     * One observer drives both the first spawn and every later resize.
+     *
+     * Spawning is deliberately deferred until the host has been laid out: a
+     * PTY born at xterm's default 80×24 and corrected a moment later leaves
+     * the CLI's first frame stranded in the scrollback, and a full-screen TUI
+     * like Claude Code then redraws *under* it — which is why its interface
+     * ended up pinned to the bottom of the panel with dead space above.
+     *
+     * Resizes are debounced: a drag fires this every frame, and each resize
+     * costs the child a SIGWINCH and a full repaint.
+     */
+    const observer = new ResizeObserver(() => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (disposed || !fitToHost()) return;
+        if (!spawned) {
+          spawn();
+        } else if (idRef.current) {
+          void ipc.resizeTerminal(idRef.current, term.cols, term.rows);
+        }
+      }, 60);
+    });
+    observer.observe(host);
 
     return () => {
       disposed = true;
+      clearTimeout(timer);
+      observer.disconnect();
       unregister();
       if (idRef.current) void ipc.killTerminal(idRef.current);
       term.dispose();
@@ -272,26 +359,10 @@ function TerminalView({
     if (xtermRef.current) xtermRef.current.options.theme = readTheme();
   }, [theme]);
 
-  // Fit to the container: on activation and on resize.
+  // Becoming the visible tab takes the keyboard; the observer above has
+  // already refit the grid, since going from `display:none` is a resize.
   React.useEffect(() => {
-    if (!active) return;
-    const host = hostRef.current;
-    const fit = fitRef.current;
-    if (!host || !fit) return;
-    const refit = () => {
-      try {
-        fit.fit();
-      } catch {
-        return;
-      }
-      const term = xtermRef.current;
-      if (term && idRef.current) void ipc.resizeTerminal(idRef.current, term.cols, term.rows);
-    };
-    refit();
-    xtermRef.current?.focus();
-    const observer = new ResizeObserver(refit);
-    observer.observe(host);
-    return () => observer.disconnect();
+    if (active) xtermRef.current?.focus();
   }, [active]);
 
   return (
