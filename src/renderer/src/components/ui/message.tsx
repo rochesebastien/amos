@@ -47,11 +47,20 @@ function MessageGroup({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+/**
+ * The gutter mark of a message, centred on the first line of its content.
+ *
+ * The box is one line tall and centres what it holds, so an avatar larger than
+ * the line overhangs it evenly instead of sitting on a baseline. Anchoring to
+ * the bottom of the row — which is what this did before — put the mark level
+ * with the *last* line, so it drifted further from the name the longer the
+ * answer got.
+ */
 function MessageAvatar({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="message-avatar"
-      className={cn("flex shrink-0 items-end pb-0.5", className)}
+      className={cn("flex h-5 shrink-0 items-center", className)}
       {...props}
     />
   );

@@ -3,7 +3,7 @@ import { MessageSquare, MessageSquarePlus, Folder } from "lucide-react";
 import { useAllChatSessions, useProjects } from "@/lib/queries";
 import { relativeTime, useT } from "@/lib/i18n";
 import { ViewHeader } from "@/components/ViewHeader";
-import { BackendGlyph } from "@/components/Sidebar";
+import { BackendGlyph } from "@/components/BrandIcons";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -71,7 +71,7 @@ export function ConversationsView() {
                     className="group flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 transition-colors hover:bg-accent"
                   >
                     <span className="flex size-4 shrink-0 items-center justify-center">
-                      <BackendGlyph backend={session.backend} />
+                      <BackendGlyph backend={session.backend} className="size-3.5 text-foreground/70" />
                     </span>
                     <span className="flex min-w-0 flex-1 flex-col">
                       <span className="truncate text-sm">

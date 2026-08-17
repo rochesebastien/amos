@@ -19,13 +19,12 @@ import {
   Plus,
 } from "lucide-react";
 import { itemsOfKind, type CapabilityKind } from "@shared/capabilities";
-import type { ChatBackend } from "@shared/chat";
 import { useApp } from "@/lib/store";
 import { useT, type TFunc } from "@/lib/i18n";
 import { useChatSessions, useProjectMutations, useProjects, useProjectScan } from "@/lib/queries";
 import { ipc, type Project } from "@/lib/ipc";
 import { useSidebar, type ProjectSort, type SidebarView, SIDEBAR_RAIL } from "@/lib/sidebar";
-import { EcosystemGlyph } from "@/components/BrandIcons";
+import { BackendGlyph } from "@/components/BrandIcons";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useConfirm } from "@/components/ui/confirm";
 import { EcosystemBadge, KIND_ICONS, ScopeIcon } from "@/components/CapabilityBadges";
@@ -675,14 +674,6 @@ function TreeIcon({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** The mark of the CLI a conversation runs on; `echo` has no brand to show. */
-export function BackendGlyph({ backend }: { backend: ChatBackend }) {
-  if (backend !== "claude" && backend !== "codex") {
-    return <MessageSquare className="size-3 text-muted-foreground/70" />;
-  }
-  return <EcosystemGlyph ecosystem={backend} className="size-3 text-foreground/70" />;
-}
-
 /** The project's saved chats, listed like a capability section. */
 function ConversationsSection({ t, projectId }: { t: TFunc; projectId: string }) {
   const { data: sessions = [] } = useChatSessions(projectId);
@@ -731,7 +722,7 @@ function ConversationsSection({ t, projectId }: { t: TFunc; projectId: string })
             activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}
           >
             <TreeIcon>
-              <BackendGlyph backend={session.backend} />
+              <BackendGlyph backend={session.backend} className="size-3 text-foreground/70" />
             </TreeIcon>
             <span className="min-w-0 flex-1 truncate">{session.title || t("chat.untitled")}</span>
           </Link>

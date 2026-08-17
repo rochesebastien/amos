@@ -35,7 +35,8 @@ import { ipc } from "@/lib/ipc";
 import { useChatStream, useChatStreams, type StreamTool } from "@/lib/chatStream";
 import { relativeTime, useT, type TFunc } from "@/lib/i18n";
 import { Markdown } from "@/components/Markdown";
-import { EcosystemGlyph } from "@/components/BrandIcons";
+import { BackendGlyph } from "@/components/BrandIcons";
+import { TranscriptMinimap } from "@/components/TranscriptMinimap";
 import { ChatSetupScreen } from "./ChatSetupScreen";
 import { ViewHeader } from "@/components/ViewHeader";
 import { Button } from "@/components/ui/button";
@@ -289,6 +290,11 @@ export function ChatView() {
           scrollPreviousItemPeek={64}
         >
           <MessageScroller>
+            <TranscriptMinimap
+              prompts={messages
+                .filter((m) => m.role === "user")
+                .map((m) => ({ id: m.id, content: m.content }))}
+            />
             <MessageScrollerViewport>
               <MessageScrollerContent className="gap-6 px-6 py-6" aria-busy={streaming}>
                 {messages.map((message, index) => (
@@ -452,7 +458,7 @@ function BackendPicker({
       <Tooltip>
         <TooltipTrigger asChild>
           <span className="flex h-9 items-center gap-1.5 rounded-md px-2 text-[13px] text-muted-foreground">
-            <BackendGlyph backend={value} />
+            <BackendGlyph backend={value} className="size-3.5" />
             {t(`chat.backend.${value}`)}
           </span>
         </TooltipTrigger>
@@ -468,7 +474,7 @@ function BackendPicker({
           type="button"
           className="flex h-9 max-w-[160px] items-center gap-1 rounded-lg px-2 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
-          <BackendGlyph backend={value} />
+          <BackendGlyph backend={value} className="size-3.5" />
           <span className="truncate">{t(`chat.backend.${value}`)}</span>
           <ChevronDown className="size-3.5 shrink-0" />
         </button>
@@ -483,19 +489,13 @@ function BackendPicker({
                 value === candidate ? "opacity-100" : "opacity-0",
               )}
             />
-            <BackendGlyph backend={candidate} />
+            <BackendGlyph backend={candidate} className="size-3.5" />
             <span className="flex-1 truncate">{t(`chat.backend.${candidate}`)}</span>
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );
-}
-
-/** The mark of a chat backend, when that backend is one of the two CLIs. */
-function BackendGlyph({ backend }: { backend: ChatBackend }) {
-  if (backend !== "claude" && backend !== "codex") return null;
-  return <EcosystemGlyph ecosystem={backend} className="size-3.5 shrink-0" />;
 }
 
 /** The project's past conversations. */
@@ -592,7 +592,10 @@ function ChatMessageRow({
         <LogoMark className="size-7" />
       </MessageAvatar>
       <MessageContent>
-        <MessageHeader>{t(`chat.backend.${backend}`)}</MessageHeader>
+        <MessageHeader>
+          <BackendGlyph backend={backend} className="size-3.5 text-foreground/70" />
+          {t(`chat.backend.${backend}`)}
+        </MessageHeader>
 
         {msg.tools.map((tool) => (
           <ToolMarker key={tool.id} tool={tool} />

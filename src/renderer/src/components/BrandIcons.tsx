@@ -1,4 +1,6 @@
+import { MessageSquare } from "lucide-react";
 import type { Ecosystem } from "@shared/capabilities";
+import type { ChatBackend } from "@shared/chat";
 import { cn } from "@/lib/utils";
 
 /**
@@ -60,4 +62,23 @@ export function EcosystemGlyph({
 }: { ecosystem: Ecosystem } & Props) {
   const Glyph = ecosystem === "claude" ? ClaudeGlyph : CodexGlyph;
   return <Glyph className={className} title={title} />;
+}
+
+/**
+ * The mark of a chat backend. `echo` is the development driver and has no
+ * brand of its own, so it falls back to a generic message icon rather than to
+ * nothing — a row that sometimes has an icon and sometimes does not makes the
+ * whole column look broken.
+ */
+export function BackendGlyph({ backend, className, title }: { backend: ChatBackend } & Props) {
+  if (backend === "claude" || backend === "codex") {
+    return <EcosystemGlyph ecosystem={backend} className={className} title={title} />;
+  }
+  return (
+    <MessageSquare
+      role={title ? "img" : "presentation"}
+      aria-label={title}
+      className={cn("shrink-0", className)}
+    />
+  );
 }
