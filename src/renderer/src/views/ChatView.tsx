@@ -2,24 +2,21 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import {
   AlertCircle,
-  ArrowUp,
   Check,
   ChevronDown,
   Copy,
-  Folder,
-  GitBranch,
   MessageSquarePlus,
-  Square,
   Trash2,
   Wrench,
 } from "lucide-react";
-import type { GitHead } from "@shared/ipc";
 import {
-  CHAT_BACKENDS,
   CHAT_BACKEND_SETTING,
+  chatEffortSetting,
+  chatModelSetting,
   readyBackends,
   type ChatBackend,
   type ChatMessage,
+  type ReasoningEffort,
 } from "@shared/chat";
 import {
   useChatSession,
@@ -37,6 +34,7 @@ import { relativeTime, useT, type TFunc } from "@/lib/i18n";
 import { Markdown } from "@/components/Markdown";
 import { BackendGlyph } from "@/components/BrandIcons";
 import { TranscriptMinimap } from "@/components/TranscriptMinimap";
+import { ChatComposer } from "@/components/ChatComposer";
 import { ChatSetupScreen } from "./ChatSetupScreen";
 import { ViewHeader } from "@/components/ViewHeader";
 import { Button } from "@/components/ui/button";
@@ -139,6 +137,10 @@ export function ChatView() {
   const backend: ChatBackend = detail?.session.backend ?? preferred;
   const streaming = stream?.streaming === true;
 
+  // The composer owns these two; the view only carries them into the turn.
+  const { data: storedModel } = useSetting(chatModelSetting(backend));
+  const { data: storedEffort } = useSetting(chatEffortSetting(backend));
+
   // A brand new chat starts with an empty composer.
   useEffect(() => {
     setInput("");
@@ -188,7 +190,14 @@ export function ChatView() {
     setInput("");
     setSendError(null);
     try {
-      const result = await ipc.sendChat({ projectId, sessionId, backend, prompt });
+      const result = await ipc.sendChat({
+        projectId,
+        sessionId,
+        backend,
+        prompt,
+        model: storedModel?.value || null,
+        effort: (storedEffort?.value as ReasoningEffort | undefined) ?? null,
+      });
       if (backend !== storedBackend?.value) {
         saveSetting.mutate({ key: CHAT_BACKEND_SETTING, value: backend });
       }
@@ -219,13 +228,6 @@ export function ChatView() {
     await deleteSession.mutateAsync(id);
     clearStream(id);
     if (id === sessionId) void navigate({ to: "/p/$projectId/chat", params: { projectId } });
-  };
-
-  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      void send();
-    }
   };
 
   const empty = messages.length === 0;
@@ -318,183 +320,29 @@ export function ChatView() {
       )}
 
       <div className="px-6 py-4">
-        <div className="mx-auto w-full max-w-3xl">
-          {stream?.aborted && !streaming && (
-            <p className="mb-2 text-[12px] text-muted-foreground/70">{t("chat.stopped")}</p>
-          )}
-          {sendError && (
-            <p className="mb-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-[13px] text-destructive">
-              {sendError}
-            </p>
-          )}
-
-          <ComposerContext
-            t={t}
-            projectName={project?.name ?? null}
-            projectPath={project?.path ?? null}
-            head={git?.head ?? null}
-          />
-
-          <div className="flex items-end gap-2 rounded-xl border border-input bg-card p-2 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30">
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={onKeyDown}
-              rows={1}
-              aria-label={t("chat.messageLabel")}
-              placeholder={t("chat.sendPlaceholder")}
-              className="max-h-48 min-h-[36px] flex-1 resize-none bg-transparent px-2 py-1.5 text-sm outline-none placeholder:text-muted-foreground"
-            />
-
-            <BackendPicker
-              t={t}
-              value={backend}
-              available={available}
-              locked={Boolean(detail)}
-              onChange={setPickedBackend}
-            />
-
-            {streaming ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant="secondary"
-                    aria-label={t("chat.stop")}
-                    onClick={stop}
-                  >
-                    <Square className="size-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{t("chat.stop")}</TooltipContent>
-              </Tooltip>
-            ) : (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    aria-label={t("chat.send")}
-                    onClick={() => void send()}
-                    disabled={!input.trim()}
-                  >
-                    <ArrowUp className="size-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{t("chat.send")}</TooltipContent>
-              </Tooltip>
-            )}
-          </div>
-          <p className="mt-2 text-center text-[11px] text-muted-foreground/60">
-            {t("chat.disclaimer", { backend: t(`chat.backend.${backend}`) })}
+        {stream?.aborted && !streaming && (
+          <p className="mx-auto mb-2 w-full max-w-3xl text-[12px] text-muted-foreground/70">
+            {t("chat.stopped")}
           </p>
-        </div>
+        )}
+        <ChatComposer
+          project={project}
+          projects={projects}
+          head={git?.head ?? null}
+          backend={backend}
+          available={available}
+          backendLocked={Boolean(detail)}
+          onBackendChange={setPickedBackend}
+          value={input}
+          onChange={setInput}
+          onSubmit={() => void send()}
+          onStop={stop}
+          streaming={streaming}
+          error={sendError}
+          textareaRef={textareaRef}
+        />
       </div>
     </div>
-  );
-}
-
-/**
- * What the next turn will actually run against: which folder, and which branch
- * that folder is on. The CLI inherits the project directory as its working
- * directory, so "which branch am I about to change" is a property of the
- * prompt, not a detail buried in the project view — it belongs next to the
- * composer, beside the backend picker that answers "which CLI".
- *
- * Renders nothing outside a git working tree: most folders are not one, and an
- * empty chip would be noise.
- */
-function ComposerContext({
-  t,
-  projectName,
-  projectPath,
-  head,
-}: {
-  t: TFunc;
-  projectName: string | null;
-  projectPath: string | null;
-  head: GitHead | null;
-}) {
-  if (!projectName) return null;
-  const branch = head?.branch ?? head?.detachedAt ?? null;
-  return (
-    <div className="mb-1.5 flex items-center gap-1.5 px-1">
-      <span
-        title={projectPath ?? undefined}
-        className="flex min-w-0 items-center gap-1.5 rounded-md border border-border bg-card px-2 py-0.5 text-[11px] text-muted-foreground"
-      >
-        <Folder className="size-3 shrink-0" />
-        <span className="truncate">{projectName}</span>
-      </span>
-      {branch && (
-        <span
-          title={head?.branch ? t("chat.onBranch", { branch }) : t("chat.detachedHead")}
-          className="flex min-w-0 items-center gap-1.5 rounded-md border border-border bg-card px-2 py-0.5 text-[11px] text-muted-foreground"
-        >
-          <GitBranch className="size-3 shrink-0" />
-          <span className="max-w-[16rem] truncate">{branch}</span>
-        </span>
-      )}
-    </div>
-  );
-}
-
-/** Which CLI answers. Locked once a session exists — see the manager's note. */
-function BackendPicker({
-  t,
-  value,
-  available,
-  locked,
-  onChange,
-}: {
-  t: TFunc;
-  value: ChatBackend;
-  available: ChatBackend[];
-  locked: boolean;
-  onChange: (backend: ChatBackend) => void;
-}) {
-  if (locked) {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="flex h-9 items-center gap-1.5 rounded-md px-2 text-[13px] text-muted-foreground">
-            <BackendGlyph backend={value} className="size-3.5" />
-            {t(`chat.backend.${value}`)}
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>{t("chat.backendLocked")}</TooltipContent>
-      </Tooltip>
-    );
-  }
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className="flex h-9 max-w-[160px] items-center gap-1 rounded-lg px-2 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-        >
-          <BackendGlyph backend={value} className="size-3.5" />
-          <span className="truncate">{t(`chat.backend.${value}`)}</span>
-          <ChevronDown className="size-3.5 shrink-0" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>{t("chat.backendLabel")}</DropdownMenuLabel>
-        {CHAT_BACKENDS.filter((candidate) => available.includes(candidate)).map((candidate) => (
-          <DropdownMenuItem key={candidate} onSelect={() => onChange(candidate)}>
-            <Check
-              className={cn(
-                "size-3.5 shrink-0 text-primary",
-                value === candidate ? "opacity-100" : "opacity-0",
-              )}
-            />
-            <BackendGlyph backend={candidate} className="size-3.5" />
-            <span className="flex-1 truncate">{t(`chat.backend.${candidate}`)}</span>
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }
 

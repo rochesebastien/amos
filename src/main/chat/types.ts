@@ -1,4 +1,4 @@
-import type { ChatBackend, ChatEvent } from "../../shared/chat.js";
+import type { ChatBackend, ChatEvent, ReasoningEffort } from "../../shared/chat.js";
 
 /**
  * The one shape every backend has to fit into. A driver knows how to talk to
@@ -13,6 +13,16 @@ export type ChatDriverSendInput = {
   prompt: string;
   /** Continues a previous conversation when the driver understands the token. */
   resumeToken: string | null;
+  /**
+   * Model and effort for this turn.
+   *
+   * Both are per-turn rather than baked into the driver: the user can change
+   * either between two messages of the same conversation, and a driver rebuilt
+   * for that would drop Codex's app-server and its live conversation with it.
+   * A driver ignores what its vendor has no knob for.
+   */
+  model?: string | null;
+  effort?: ReasoningEffort | null;
   /**
    * Called for every `token` / `tool_call` / `tool_result` / `error` the turn
    * produces. Drivers never emit `start` or `done`.

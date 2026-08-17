@@ -25,6 +25,7 @@ export const qk = {
   projects: ["projects"] as const,
   scan: (projectId: string) => ["scan", projectId] as const,
   gitHead: (projectId: string) => ["git", "head", projectId] as const,
+  gitBranches: (projectId: string) => ["git", "branches", projectId] as const,
   setting: (key: string) => ["setting", key] as const,
   file: (path: string) => ["file", path] as const,
   dir: (path: string) => ["dir", path] as const,
@@ -196,6 +197,35 @@ export function useGitHead(projectId: string | null | undefined) {
     enabled: Boolean(projectId),
     staleTime: 5_000,
     refetchOnWindowFocus: true,
+  });
+}
+
+/** Local branches of a project. Only fetched when the picker is opened. */
+export function useGitBranches(projectId: string | null | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: qk.gitBranches(projectId ?? ""),
+    queryFn: () => ipc.gitBranches(projectId!),
+    enabled: Boolean(projectId) && enabled,
+    staleTime: 5_000,
+  });
+}
+
+/**
+ * Switch branch. Everything the app knows about the project is derived from
+ * files that a checkout rewrites — instructions, agents, MCP config — so the
+ * scan goes with the branch, not just the branch label.
+ */
+export function useGitCheckout(projectId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (branch: string) => ipc.gitCheckout(projectId, branch),
+    onSuccess: async () => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: qk.gitHead(projectId) }),
+        client.invalidateQueries({ queryKey: qk.gitBranches(projectId) }),
+        client.invalidateQueries({ queryKey: qk.scan(projectId) }),
+      ]);
+    },
   });
 }
 

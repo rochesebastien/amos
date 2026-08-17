@@ -5,6 +5,10 @@ import { useProjectScan } from "@/lib/queries";
 import { useT } from "@/lib/i18n";
 import { EcosystemBadge, ScopeBadge } from "@/components/CapabilityBadges";
 import { InstructionEditor } from "@/components/editors/InstructionEditor";
+import {
+  EditorActionProvider,
+  EditorActionSlot,
+} from "@/components/editors/shell";
 import { formatBytes } from "@/lib/utils";
 
 /**
@@ -16,7 +20,9 @@ import { formatBytes } from "@/lib/utils";
  */
 export function InstructionView() {
   const t = useT();
-  const { projectId, fileId } = useParams({ from: "/p/$projectId/instructions/$fileId" });
+  const { projectId, fileId } = useParams({
+    from: "/p/$projectId/instructions/$fileId",
+  });
   const { data: scan, isPending } = useProjectScan(projectId);
 
   if (isPending) {
@@ -47,36 +53,39 @@ export function InstructionView() {
   }
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col">
-      <ViewHeader
-        backTo="/p/$projectId"
-        backParams={{ projectId }}
-        backLabel={t("cap.backToProject")}
-        icon={<FileText className="size-4" />}
-        title={file.relativePath}
-        meta={
-          <>
-            <EcosystemBadge ecosystem={file.ecosystem} size="sm" />
-            <ScopeBadge scope={file.scope} size="sm" />
-            <span className="shrink-0 text-xs text-muted-foreground/60">
-              {formatBytes(file.bytes)}
-            </span>
-            <span
-              className="hidden truncate font-mono text-[12px] text-muted-foreground/60 lg:block"
-              title={file.path}
-            >
-              {file.path}
-            </span>
-          </>
-        }
-      />
+    <EditorActionProvider>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <ViewHeader
+          backTo="/p/$projectId"
+          backParams={{ projectId }}
+          backLabel={t("cap.backToProject")}
+          icon={<FileText className="size-4" />}
+          title={file.relativePath}
+          meta={
+            <>
+              <EcosystemBadge ecosystem={file.ecosystem} size="sm" />
+              <ScopeBadge scope={file.scope} size="sm" />
+              <span className="shrink-0 text-xs text-muted-foreground/60">
+                {formatBytes(file.bytes)}
+              </span>
+              <span
+                className="hidden truncate font-mono text-[12px] text-muted-foreground/60 lg:block"
+                title={file.path}
+              >
+                {file.path}
+              </span>
+            </>
+          }
+          actions={<EditorActionSlot />}
+        />
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-8 py-4">
-        <p className="mb-3 text-[13px] text-muted-foreground/70">
-          {t(`instructions.read.${file.ecosystem}`)}
-        </p>
-        <InstructionEditor projectId={projectId} file={file} />
+        <div className="min-h-0 flex-1 overflow-y-auto px-8 py-4">
+          <p className="mb-3 text-[13px] text-muted-foreground/70">
+            {t(`instructions.read.${file.ecosystem}`)}
+          </p>
+          <InstructionEditor projectId={projectId} file={file} />
+        </div>
       </div>
-    </div>
+    </EditorActionProvider>
   );
 }

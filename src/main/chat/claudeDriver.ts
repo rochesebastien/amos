@@ -77,7 +77,9 @@ export function createClaudeDriver(options: ClaudeDriverOptions): ChatDriver {
         // whole point of AMOS: load every settings source, like the CLI does.
         settingSources: ["user", "project", "local"],
         pathToClaudeCodeExecutable: binaryPath,
-        ...(options.model ? { model: options.model } : {}),
+        // The turn's own choice wins; the driver-level model is the fallback
+        // for callers that never pass one.
+        ...(input.model || options.model ? { model: input.model || options.model! } : {}),
         ...(input.resumeToken ? { resume: input.resumeToken } : {}),
       };
 

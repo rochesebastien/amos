@@ -14,6 +14,7 @@ import type {
   ChatSession,
   ChatSessionDetail,
   CliDetection,
+  ReasoningEffort,
 } from "./chat.js";
 import type {
   TerminalCreateRequest,
@@ -221,6 +222,13 @@ export type IpcInvokeMap = {
    * working tree — not an error, most folders simply are not repositories.
    */
   "git:head": { request: { projectId: string }; response: { head: GitHead | null } };
+  /** Local branches of a project, sorted. Empty when it is not a repository. */
+  "git:branches": { request: { projectId: string }; response: { branches: string[] } };
+  /**
+   * Move the working tree to a branch. Rejects with git's own message when it
+   * refuses — an unclean tree is git's call to make, not AMOS's.
+   */
+  "git:checkout": { request: { projectId: string; branch: string }; response: { ok: true } };
 
   /** Read a UTF-8 file inside an allowed root. */
   "fs:readFile": { request: { path: string }; response: ReadFileResult };
@@ -254,6 +262,10 @@ export type IpcInvokeMap = {
       sessionId?: string | null;
       backend: ChatBackend;
       prompt: string;
+      /** Model id for this turn; omitted or empty means the CLI's default. */
+      model?: string | null;
+      /** Effort for this turn. Ignored by backends that have no such knob. */
+      effort?: ReasoningEffort | null;
     };
     response: { sessionId: string };
   };
@@ -298,6 +310,8 @@ export const IPC_CHANNELS = [
   "scan:watch",
   "scan:unwatch",
   "git:head",
+  "git:branches",
+  "git:checkout",
   "fs:readFile",
   "fs:writeFile",
   "fs:listDir",
@@ -355,6 +369,8 @@ export type AmosApi = {
   };
   git: {
     head(input: { projectId: string }): Promise<{ head: GitHead | null }>;
+    branches(input: { projectId: string }): Promise<{ branches: string[] }>;
+    checkout(input: { projectId: string; branch: string }): Promise<{ ok: true }>;
   };
   fs: {
     readFile(input: { path: string }): Promise<ReadFileResult>;

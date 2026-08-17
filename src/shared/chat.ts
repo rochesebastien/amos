@@ -145,6 +145,66 @@ export const ECHO_DRIVER_SETTING = "chat.echoDriver";
 /** Setting holding the backend the composer should preselect. */
 export const CHAT_BACKEND_SETTING = "chat.backend";
 
+// ------------------------------------------------------- models and effort
+
+/** One model a backend can be asked to run. */
+export type ChatModel = {
+  /** What the CLI is given. Empty string means "the CLI's own default". */
+  id: string;
+  label: string;
+};
+
+/**
+ * The models each CLI accepts, in display order, first entry the default.
+ *
+ * AMOS deliberately does not try to discover these: neither CLI exposes a
+ * "list models" call, both accept an arbitrary id, and a hardcoded list that
+ * falls behind is a much smaller problem than a picker that cannot open. The
+ * ids are what the vendor's own `--model` flag takes.
+ */
+export const CHAT_MODELS: Record<CliVendor, ChatModel[]> = {
+  claude: [
+    { id: "", label: "Default" },
+    { id: "opus", label: "Opus" },
+    { id: "sonnet", label: "Sonnet" },
+    { id: "haiku", label: "Haiku" },
+  ],
+  codex: [
+    { id: "", label: "Default" },
+    { id: "gpt-5-codex", label: "GPT-5 Codex" },
+    { id: "gpt-5", label: "GPT-5" },
+  ],
+};
+
+/** How hard the backend should think before answering. */
+export const REASONING_EFFORTS = ["low", "medium", "high"] as const;
+export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
+
+/**
+ * Which backends actually take an effort level.
+ *
+ * Only Codex does: its `sendUserTurn` carries the field. The Claude Agent SDK
+ * has no equivalent knob, so the control is hidden there rather than shown and
+ * quietly ignored — a setting that does nothing is worse than no setting.
+ */
+export function supportsEffort(backend: ChatBackend): boolean {
+  return backend === "codex";
+}
+
+/** Models a backend offers; `echo` takes none. */
+export function modelsFor(backend: ChatBackend): ChatModel[] {
+  return isCliVendor(backend) ? CHAT_MODELS[backend] : [];
+}
+
+/** Per-backend setting keys, so switching CLI keeps each one's own choice. */
+export function chatModelSetting(backend: ChatBackend): string {
+  return `chat.model.${backend}`;
+}
+
+export function chatEffortSetting(backend: ChatBackend): string {
+  return `chat.effort.${backend}`;
+}
+
 /** Environment variable that force-enables the echo driver for a dev run. */
 export const ECHO_DRIVER_ENV = "AMOS_ECHO_DRIVER";
 

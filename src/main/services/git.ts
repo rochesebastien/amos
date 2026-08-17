@@ -1,6 +1,10 @@
+import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { promisify } from "node:util";
 import type { GitHead } from "../../shared/ipc.js";
+
+const run = promisify(execFile);
 
 /**
  * Which git branch a project folder is on.
@@ -60,4 +64,69 @@ export async function readGitHead(projectPath: string): Promise<GitHead | null> 
     return { branch: null, detachedAt: trimmed.slice(0, 7) };
   }
   return null;
+}
+
+/**
+ * Every local branch of a project, sorted, plus the one HEAD is on.
+ *
+ * Loose refs live as files under `refs/heads`; branches that have been packed
+ * (`git gc`) live only as lines in `packed-refs`. A repository that has been
+ * garbage-collected has an almost empty `refs/heads`, so reading just the
+ * directory would report a handful of branches on a repo that has fifty.
+ */
+export async function listBranches(projectPath: string): Promise<string[]> {
+  const dir = await gitDir(projectPath);
+  if (!dir) return [];
+
+  const names = new Set<string>();
+
+  // Loose refs: refs/heads/<name>, where <name> may itself contain slashes.
+  const headsRoot = path.join(dir, "refs", "heads");
+  const walk = async (current: string, prefix: string) => {
+    const entries = await fs.readdir(current, { withFileTypes: true }).catch(() => []);
+    for (const entry of entries) {
+      const name = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) await walk(path.join(current, entry.name), name);
+      else if (entry.isFile()) names.add(name);
+    }
+  };
+  await walk(headsRoot, "");
+
+  // Packed refs: "<sha> refs/heads/<name>" lines, with comments and peeled
+  // tag lines ("^<sha>") mixed in.
+  const packed = await fs.readFile(path.join(dir, "packed-refs"), "utf8").catch(() => "");
+  for (const line of packed.split("\n")) {
+    const match = /^[0-9a-f]{40}\s+refs\/heads\/(.+)$/.exec(line.trim());
+    if (match?.[1]) names.add(match[1]);
+  }
+
+  return [...names].sort((a, b) => a.localeCompare(b));
+}
+
+/**
+ * Move the working tree to `branch`.
+ *
+ * This is the one place AMOS shells out to git, because it is the one
+ * operation that cannot be done by writing files: git has to update the index
+ * and the tree. `execFile` (never a shell) with the branch as its own argument
+ * means the name is data, not something a shell could reinterpret.
+ *
+ * Uncommitted work is git's call, not ours — it refuses a checkout that would
+ * clobber local changes, and that refusal is passed back verbatim so the user
+ * reads git's own words rather than a paraphrase.
+ */
+export async function checkoutBranch(projectPath: string, branch: string): Promise<void> {
+  // A ref cannot start with "-", so this is only ever an attempt to smuggle a
+  // flag into the argument list.
+  if (!branch || branch.startsWith("-")) throw new Error(`Invalid branch name: ${branch}`);
+  try {
+    // The branch goes *before* the `--`, and the `--` closes an empty pathspec.
+    // `checkout -- <name>` is the opposite command — it restores the file of
+    // that name from the index, throwing away the working copy — so the order
+    // here is the difference between switching branch and destroying work.
+    await run("git", ["-C", projectPath, "checkout", branch, "--"], { timeout: 15_000 });
+  } catch (error) {
+    const stderr = (error as { stderr?: string }).stderr?.trim();
+    throw new Error(stderr || (error instanceof Error ? error.message : String(error)));
+  }
 }

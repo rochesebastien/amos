@@ -1,5 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import type { ChatEvent } from "../../shared/chat.js";
+import type { ChatEvent, ReasoningEffort } from "../../shared/chat.js";
 import {
   classifyCodexMessage,
   createCodexMapper,
@@ -324,7 +324,13 @@ export function createCodexDriver(options: CodexDriverOptions): ChatDriver {
     };
   }
 
-  async function startTurn(conversationId: string, cwd: string, prompt: string): Promise<void> {
+  async function startTurn(
+    conversationId: string,
+    cwd: string,
+    prompt: string,
+    turn: { model?: string | null; effort?: ReasoningEffort | null } = {},
+  ): Promise<void> {
+    const model = turn.model || options.model;
     const params: Record<string, unknown> = {
       conversationId,
       items: [{ type: "text", text: prompt }],
@@ -332,7 +338,8 @@ export function createCodexDriver(options: CodexDriverOptions): ChatDriver {
       approvalPolicy: "on-request",
       sandboxPolicy: { mode: "workspace-write" },
       summary: "auto",
-      ...(options.model ? { model: options.model } : {}),
+      ...(model ? { model } : {}),
+      ...(turn.effort ? { effort: turn.effort } : {}),
     };
     try {
       await server.request("sendUserTurn", params);
@@ -395,7 +402,10 @@ export function createCodexDriver(options: CodexDriverOptions): ChatDriver {
           return;
         }
 
-        void startTurn(conversationId, input.cwd, input.prompt).catch((error) => {
+        void startTurn(conversationId, input.cwd, input.prompt, {
+          model: input.model,
+          effort: input.effort,
+        }).catch((error) => {
           input.onEvent(toErrorEvent(error));
           finish("complete");
         });

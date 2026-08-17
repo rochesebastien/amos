@@ -50,6 +50,9 @@ export type BridgeOverrides = {
   projects?: Project[];
   scan?: (projectId: string) => ProjectScan;
   sessions?: (projectId: string) => ChatSession[];
+  branches?: string[];
+  /** Seed settings; the fake bridge keeps writes in this same map. */
+  settings?: Record<string, string>;
 };
 
 /**
@@ -58,6 +61,7 @@ export type BridgeOverrides = {
  */
 export function installBridge(overrides: BridgeOverrides = {}) {
   const projects = overrides.projects ?? PROJECTS;
+  const settings = overrides.settings ?? {};
   window.amos = {
     projects: { list: async () => projects },
     scan: {
@@ -68,7 +72,18 @@ export function installBridge(overrides: BridgeOverrides = {}) {
       listSessions: async ({ projectId }: { projectId: string }) =>
         overrides.sessions ? overrides.sessions(projectId) : [],
     },
-    settings: { get: async () => ({ key: "", value: null }) },
+    git: {
+      head: async () => ({ head: { branch: "main", detachedAt: null } }),
+      branches: async () => ({ branches: overrides.branches ?? [] }),
+      checkout: async () => ({ ok: true }),
+    },
+    settings: {
+      get: async ({ key }: { key: string }) => ({ key, value: settings[key] ?? null }),
+      set: async ({ key, value }: { key: string; value: string }) => {
+        settings[key] = value;
+        return { key, value };
+      },
+    },
   } as unknown as typeof window.amos;
 }
 

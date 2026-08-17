@@ -15,6 +15,7 @@ import {
   CLI_VENDORS,
   ECHO_DRIVER_ENV,
   ECHO_DRIVER_SETTING,
+  REASONING_EFFORTS,
   type CliDetection,
   type CliVendor,
 } from "../shared/chat.js";
@@ -47,7 +48,7 @@ import { WatchManager } from "./scanner/watch.js";
 import { getSetting, setSetting } from "./services/settings.js";
 import { buildAllowedRoots, resolveAllowedPath } from "./services/paths.js";
 import { listDirectory, readTextFile } from "./services/files.js";
-import { readGitHead } from "./services/git.js";
+import { checkoutBranch, listBranches, readGitHead } from "./services/git.js";
 import { safeWriteFile } from "./services/safeWrite.js";
 
 /**
@@ -133,6 +134,15 @@ const ChatSendRequest = z.object({
   sessionId: z.string().min(1).max(200).nullable().optional(),
   backend: z.enum(CHAT_BACKENDS),
   prompt: z.string().min(1).max(500_000),
+  model: z.string().max(200).nullable().optional(),
+  effort: z.enum(REASONING_EFFORTS).nullable().optional(),
+});
+
+// A branch name is passed to git as its own argument, never through a shell,
+// but it is still bounded here — the renderer is untrusted like any other.
+const GitCheckoutRequest = z.object({
+  projectId: z.string().min(1),
+  branch: z.string().min(1).max(255),
 });
 
 /**
@@ -291,6 +301,19 @@ export function registerIpcHandlers(): void {
     const project = getProject(input.projectId);
     if (!project) throw new Error(`Unknown project: ${input.projectId}`);
     return { head: await readGitHead(project.path) };
+  });
+
+  handle("git:branches", ScanRequest, async (input) => {
+    const project = getProject(input.projectId);
+    if (!project) throw new Error(`Unknown project: ${input.projectId}`);
+    return { branches: await listBranches(project.path) };
+  });
+
+  handle("git:checkout", GitCheckoutRequest, async (input) => {
+    const project = getProject(input.projectId);
+    if (!project) throw new Error(`Unknown project: ${input.projectId}`);
+    await checkoutBranch(project.path, input.branch);
+    return { ok: true } as const;
   });
 
   // ----- filesystem ---------------------------------------------------------

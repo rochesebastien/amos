@@ -1,7 +1,10 @@
+import * as React from "react";
+import { createPortal } from "react-dom";
 import { AlertTriangle, Check, Info, RotateCcw, Save } from "lucide-react";
 import { isWriteConflict } from "@shared/ipc";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useT, type TFunc } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -64,8 +67,39 @@ export function Notice({
 }
 
 /**
- * Sticky footer of an editor: save, revert, and the state of the last attempt.
- * Nothing is written until Save — AMOS never autosaves somebody's config.
+ * Where an editor's actions are drawn.
+ *
+ * The buttons belong at the top right of the view, next to the thing they act
+ * on, rather than at the far end of a form that can be several screens long —
+ * scrolling to the bottom to save is a tax on every edit. But the header is
+ * the *view's* furniture and the buttons are the *editor's* state, so the
+ * editor keeps owning them and posts them upwards through this slot.
+ */
+const ActionSlotContext = React.createContext<{
+  node: HTMLElement | null;
+  setNode: (node: HTMLElement | null) => void;
+} | null>(null);
+
+/** Wrap a view whose header hosts `<EditorActionSlot />`. */
+export function EditorActionProvider({ children }: { children: React.ReactNode }) {
+  const [node, setNode] = React.useState<HTMLElement | null>(null);
+  const value = React.useMemo(() => ({ node, setNode }), [node]);
+  return <ActionSlotContext.Provider value={value}>{children}</ActionSlotContext.Provider>;
+}
+
+/** Drop this in the view's header `actions`; the editor fills it. */
+export function EditorActionSlot() {
+  const slot = React.useContext(ActionSlotContext);
+  return <div ref={slot?.setNode} className="flex items-center gap-1" />;
+}
+
+/**
+ * Save, revert, and whatever else this editor can do to the file, plus the
+ * state of the last attempt. Nothing is written until Save — AMOS never
+ * autosaves somebody's config.
+ *
+ * Rendered into the view's header when there is a slot for it, and in place
+ * otherwise, so an editor used outside a view still has its controls.
  */
 export function SaveBar({
   dirty,
@@ -86,29 +120,49 @@ export function SaveBar({
   extra?: React.ReactNode;
 }) {
   const t = useT();
-  return (
-    <div className="sticky bottom-0 -mx-8 mt-8 flex flex-wrap items-center gap-3 border-t border-border bg-background/95 px-8 py-3 backdrop-blur">
-      <Button onClick={onSave} disabled={!dirty || saving}>
-        <Save className="size-4" />
+  const slot = React.useContext(ActionSlotContext);
+
+  const status = error ? (
+    // The message can be a paragraph of git or filesystem prose; the header
+    // shows that something failed and keeps the words a hover away.
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="flex items-center gap-1.5 text-[12px] text-destructive">
+          <AlertTriangle className="size-3.5 shrink-0" />
+          <span className="max-w-[14rem] truncate">{errorText(error)}</span>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-sm">{errorText(error)}</TooltipContent>
+    </Tooltip>
+  ) : dirty ? (
+    <span className="text-[12px] text-muted-foreground/70">{t("cap.unsaved")}</span>
+  ) : savedAt ? (
+    <span className="flex items-center gap-1.5 text-[12px] text-muted-foreground/70">
+      <Check className="size-3.5 text-primary" />
+      {t("common.saved")}
+    </span>
+  ) : null;
+
+  const actions = (
+    <>
+      {status}
+      <Button size="sm" onClick={onSave} disabled={!dirty || saving}>
+        <Save className="size-3.5" />
         {saving ? t("common.saving") : t("common.save")}
       </Button>
-      <Button variant="ghost" onClick={onRevert} disabled={!dirty || saving}>
-        <RotateCcw className="size-4" />
+      <Button size="sm" variant="ghost" onClick={onRevert} disabled={!dirty || saving}>
+        <RotateCcw className="size-3.5" />
         {t("cap.revert")}
       </Button>
       {extra}
-      <span className="min-w-0 flex-1 text-right text-[13px]">
-        {error ? (
-          <span className="text-destructive">{errorText(error)}</span>
-        ) : dirty ? (
-          <span className="text-muted-foreground/70">{t("cap.unsaved")}</span>
-        ) : savedAt ? (
-          <span className="inline-flex items-center gap-1.5 text-muted-foreground/70">
-            <Check className="size-3.5 text-primary" />
-            {t("common.saved")}
-          </span>
-        ) : null}
-      </span>
+    </>
+  );
+
+  if (slot?.node) return createPortal(actions, slot.node);
+
+  return (
+    <div className="sticky bottom-0 -mx-8 mt-8 flex flex-wrap items-center gap-2 border-t border-border bg-background/95 px-8 py-3 backdrop-blur">
+      {actions}
     </div>
   );
 }

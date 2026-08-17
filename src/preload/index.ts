@@ -52,6 +52,8 @@ const amos: AmosApi = {
   },
   git: {
     head: (input) => invoke("git:head", input),
+    branches: (input) => invoke("git:branches", input),
+    checkout: (input) => invoke("git:checkout", input),
   },
   fs: {
     readFile: (input) => invoke("fs:readFile", input),

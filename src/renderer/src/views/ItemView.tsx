@@ -8,6 +8,10 @@ import { CapabilityBadges, KIND_ICONS } from "@/components/CapabilityBadges";
 import { AgentEditor } from "@/components/editors/AgentEditor";
 import { McpEditor } from "@/components/editors/McpEditor";
 import { SkillEditor } from "@/components/editors/SkillEditor";
+import {
+  EditorActionProvider,
+  EditorActionSlot,
+} from "@/components/editors/shell";
 
 /**
  * One capability, open for editing.
@@ -19,7 +23,9 @@ import { SkillEditor } from "@/components/editors/SkillEditor";
  */
 export function ItemView() {
   const t = useT();
-  const { projectId, itemId } = useParams({ from: "/p/$projectId/item/$itemId" });
+  const { projectId, itemId } = useParams({
+    from: "/p/$projectId/item/$itemId",
+  });
   const { data: scan, isPending } = useProjectScan(projectId);
 
   if (isPending) {
@@ -35,7 +41,9 @@ export function ItemView() {
     return (
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 text-center">
         <h1 className="text-xl font-display">{t("cap.notFound")}</h1>
-        <p className="max-w-sm text-sm text-muted-foreground/70">{t("cap.notFoundDesc")}</p>
+        <p className="max-w-sm text-sm text-muted-foreground/70">
+          {t("cap.notFoundDesc")}
+        </p>
         <Link
           to="/p/$projectId"
           params={{ projectId }}
@@ -50,40 +58,45 @@ export function ItemView() {
   const Icon = KIND_ICONS[item.kind];
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col">
-      <ViewHeader
-        backTo="/p/$projectId"
-        backParams={{ projectId }}
-        backLabel={t("cap.backToProject")}
-        icon={<Icon className="size-4" />}
-        title={item.name}
-        meta={
-          <>
-            <CapabilityBadges item={item} size="sm" />
-            <span
-              className="hidden truncate font-mono text-[12px] text-muted-foreground/60 lg:block"
-              title={item.sourceFile}
-            >
-              {item.sourceFile}
-            </span>
-          </>
-        }
-      />
+    <EditorActionProvider>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <ViewHeader
+          backTo="/p/$projectId"
+          backParams={{ projectId }}
+          backLabel={t("cap.backToProject")}
+          icon={<Icon className="size-4" />}
+          title={item.name}
+          meta={
+            <>
+              <CapabilityBadges item={item} size="sm" />
+              <span
+                className="hidden truncate font-mono text-[12px] text-muted-foreground/60 lg:block"
+                title={item.sourceFile}
+              >
+                {item.sourceFile}
+              </span>
+            </>
+          }
+          actions={<EditorActionSlot />}
+        />
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-4">
-        {item.parseError && (
-          <div className="mb-6 max-w-4xl rounded-xl border border-destructive/30 bg-destructive/10 p-4">
-            <p className="flex items-center gap-2 text-sm font-semibold text-destructive">
-              <AlertTriangle className="size-4" />
-              {t("cap.parseError")}
-            </p>
-            <p className="mt-1 font-mono text-[13px] text-destructive/90">{item.parseError}</p>
-          </div>
-        )}
+        <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-4">
+          {item.parseError && (
+            <div className="mb-6 max-w-4xl rounded-xl border border-destructive/30 bg-destructive/10 p-4">
+              <p className="flex items-center gap-2 text-sm font-semibold text-destructive">
+                <AlertTriangle className="size-4" />
+                {t("cap.parseError")}
+              </p>
+              <p className="mt-1 font-mono text-[13px] text-destructive/90">
+                {item.parseError}
+              </p>
+            </div>
+          )}
 
-        <Editor t={t} projectId={projectId} item={item} />
+          <Editor t={t} projectId={projectId} item={item} />
+        </div>
       </div>
-    </div>
+    </EditorActionProvider>
   );
 }
 
@@ -100,10 +113,14 @@ function Editor({
   // named after the file. There is no entry to edit — only a file to fix.
   if (item.kind === "mcp" && item.data === null) {
     return (
-      <p className="max-w-4xl text-sm text-muted-foreground/70">{t("cap.fixByHand")}</p>
+      <p className="max-w-4xl text-sm text-muted-foreground/70">
+        {t("cap.fixByHand")}
+      </p>
     );
   }
-  if (item.kind === "agent") return <AgentEditor projectId={projectId} item={item} />;
-  if (item.kind === "skill") return <SkillEditor projectId={projectId} item={item} />;
+  if (item.kind === "agent")
+    return <AgentEditor projectId={projectId} item={item} />;
+  if (item.kind === "skill")
+    return <SkillEditor projectId={projectId} item={item} />;
   return <McpEditor projectId={projectId} item={item} />;
 }

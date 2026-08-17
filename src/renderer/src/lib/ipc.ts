@@ -21,6 +21,7 @@ import type {
   ChatSession,
   ChatSessionDetail,
   CliDetection,
+  ReasoningEffort,
 } from "@shared/chat";
 import type { TerminalDataEvent, TerminalExitEvent, TerminalKind } from "@shared/terminal";
 
@@ -74,6 +75,10 @@ export const ipc = {
 
   /** The project's git branch; `head` is null when it is not a repository. */
   gitHead: (projectId: string) => bridge().git.head({ projectId }),
+  gitBranches: (projectId: string) => bridge().git.branches({ projectId }),
+  /** Move the working tree; rejects with git's own message when it refuses. */
+  gitCheckout: (projectId: string, branch: string) =>
+    bridge().git.checkout({ projectId, branch }),
 
   readFile: (path: string) => bridge().fs.readFile({ path }),
   writeFile: (input: { path: string; content: string; expectedMtimeMs?: number | null }) =>
@@ -93,6 +98,8 @@ export const ipc = {
     sessionId?: string | null;
     backend: ChatBackend;
     prompt: string;
+    model?: string | null;
+    effort?: ReasoningEffort | null;
   }) => bridge().chat.send(input),
   abortChat: (sessionId: string) => bridge().chat.abort({ sessionId }),
   listChatSessions: (projectId: string) => bridge().chat.listSessions({ projectId }),

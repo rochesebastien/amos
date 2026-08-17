@@ -7,6 +7,7 @@ import {
   type ChatToolCall,
   type CliDetection,
   type CliVendor,
+  type ReasoningEffort,
 } from "../../shared/chat.js";
 import type { Db } from "../db/index.js";
 import {
@@ -39,6 +40,10 @@ export type ChatSendInput = {
   sessionId?: string | null;
   backend: ChatBackend;
   prompt: string;
+  /** Model for this turn; omitted means the CLI's own default. */
+  model?: string | null;
+  /** Effort for this turn; ignored by backends with no such knob. */
+  effort?: ReasoningEffort | null;
 };
 
 export type ChatManagerOptions = {
@@ -157,6 +162,8 @@ export class ChatManager {
       cwd,
       prompt,
       resumeToken: session.resumeToken,
+      model: input.model,
+      effort: input.effort,
       assistantMessageId: assistant.id,
       controller,
     });
@@ -213,6 +220,8 @@ export class ChatManager {
     cwd: string;
     prompt: string;
     resumeToken: string | null;
+    model?: string | null;
+    effort?: ReasoningEffort | null;
     assistantMessageId: string;
     controller: AbortController;
   }): Promise<void> {
@@ -266,6 +275,8 @@ export class ChatManager {
         cwd: context.cwd,
         prompt: context.prompt,
         resumeToken: context.resumeToken,
+        model: context.model,
+        effort: context.effort,
         onEvent,
         signal: context.controller.signal,
       });
